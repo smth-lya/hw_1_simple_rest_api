@@ -6,7 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "User Service API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "API", Version = "v1" });
 });
 
 builder.Services.AddSingleton<IUserRepository, InMemoryUserRepository>();
@@ -24,6 +24,20 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.MapPost("/auth/login", async (
+    LoginRequest request,
+    IUserRepository repository) =>
+{
+    var user = await repository.GetUserByUsernameAsync(request.Username);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (user.PasswordHash != request.Password) // Подразумевается хеширвоание
+        return Results.Unauthorized();
+    
+    return Results.Ok(user);
+});
 
 app.MapPost("/users/", async (
     RegisterRequest request, 
