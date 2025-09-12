@@ -1,0 +1,72 @@
+using System.Collections.Concurrent;
+using HW1.Api.Models;
+using Microsoft.Extensions.Caching.Memory;
+
+namespace HW1.Api;
+
+public class InMemoryUserRepository : IUserRepository
+{
+    private readonly ConcurrentDictionary<Guid, User> _users = new();
+
+    private ILogger<InMemoryUserRepository> _logger;
+    
+    public InMemoryUserRepository(ILogger<InMemoryUserRepository> logger)
+    {
+        _logger = logger;
+    }
+    
+    public Task<User?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        var user = _users.GetValueOrDefault(userId);
+
+        return Task.FromResult(user);
+    }
+
+    public Task<User?> GetUserByUsernameAsync(string username, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        var user = _users.Values.FirstOrDefault(u => u.Username == username);
+        
+        return Task.FromResult(user);
+    }
+
+    public Task AddUserAsync(User user, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(user);
+        
+        var added = _users.TryAdd(user.Id, user);
+        if (!added)
+            throw new InvalidOperationException($"Пользователь с ID {user.Id} уже существует");
+
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateUserAsync(User user, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(user);
+        
+        var existingUser = _users.GetValueOrDefault(user.Id);
+        if (existingUser == null)
+            throw new InvalidOperationException($"Пользователь с ID {user.Id} не существует");
+        
+        _users[user.Id] = user;
+        
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        var removed = _users.TryRemove(userId, out _);
+        if (!removed)
+            throw new KeyNotFoundException($"Пользователь с ID {userId} не найден");
+
+        return Task.CompletedTask;
+    }
+}
