@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
-using HW1.Api.Models;
-using Microsoft.Extensions.Caching.Memory;
+using HW1.Api.Domain.Contracts.Repositories;
+using HW1.Api.Domain.Models;
 
-namespace HW1.Api;
+namespace HW1.Api.Infrastructure.Database.Repositories;
 
 public class InMemoryUserRepository : IUserRepository
 {

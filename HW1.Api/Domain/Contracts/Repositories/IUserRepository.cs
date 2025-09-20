@@ -1,6 +1,6 @@
-using HW1.Api.Models;
+using HW1.Api.Domain.Models;
 
-namespace HW1.Api;
+namespace HW1.Api.Domain.Contracts.Repositories;
 
 public interface IUserRepository
 {

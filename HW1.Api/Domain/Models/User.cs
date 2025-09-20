@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace HW1.Api.Models;
+namespace HW1.Api.Domain.Models;
 
 public sealed class User
 {
