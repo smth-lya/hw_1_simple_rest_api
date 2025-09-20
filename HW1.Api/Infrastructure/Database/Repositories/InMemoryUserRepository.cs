@@ -7,8 +7,7 @@ namespace HW1.Api.Infrastructure.Database.Repositories;
 public class InMemoryUserRepository : IUserRepository
 {
     private readonly ConcurrentDictionary<Guid, User> _users = new();
-
-    private ILogger<InMemoryUserRepository> _logger;
+    private readonly ILogger<InMemoryUserRepository> _logger;
     
     public InMemoryUserRepository(ILogger<InMemoryUserRepository> logger)
     {
@@ -33,6 +32,34 @@ public class InMemoryUserRepository : IUserRepository
         return Task.FromResult(user);
     }
 
+    public Task<IEnumerable<User>> GetUsersByDateRangeAsync(DateTime? fromDate, DateTime? toDate, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        var query = _users.Values.AsEnumerable();
+
+        if (fromDate.HasValue)
+        {
+            query = query.Where(u => u.CreatedAt >= fromDate.Value);
+        }
+
+        if (toDate.HasValue)
+        {
+            query = query.Where(u => u.CreatedAt <= toDate.Value);
+        }
+        
+        var result = query.OrderBy(u => u.CreatedAt).ToList();
+        
+        return Task.FromResult(result.AsEnumerable());
+    }
+
+    public Task<IEnumerable<User>> GetAllUsersAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        return Task.FromResult(_users.Values.AsEnumerable());
+    }
+    
     public Task AddUserAsync(User user, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

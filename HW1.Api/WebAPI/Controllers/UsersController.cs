@@ -1,51 +1,35 @@
-using HW1.Api.Domain.Contracts.Repositories;
-using HW1.Api.Domain.Contracts.Security;
-using HW1.Api.Domain.Models;
+using HW1.Api.Application.DTOs;
+using HW1.Api.Domain.Contracts.Services;
 using HW1.Api.WebAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 
-namespace HW1.Api.Controllers;
+namespace HW1.Api.WebAPI.Controllers;
 
 [ApiController]
 [Route("api/users")]
 public class UsersController : ControllerBase
 {
-    private readonly IUserRepository _userRepository;
-    private readonly IPasswordHasher _passwordHasher;
+    private readonly IUserService _userService;
     private readonly ILogger<UsersController> _logger;
     
     public UsersController(
-        IUserRepository userRepository, 
-        IPasswordHasher passwordHasher,
+        IUserService userService,
         ILogger<UsersController> logger) 
     {
-        _userRepository = userRepository;
-        _passwordHasher = passwordHasher;
+        _userService = userService;
         _logger = logger;
     }
 
     [HttpPost]
+    [ProducesResponseType(typeof(UserDto), StatusCodes.Status201Created)]
+    [ProducesResponseType( StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateUser(RegisterRequest request)
     {
         try
         {
-            var existingUser = await _userRepository.GetUserByUsernameAsync(request.Username);
-            if (existingUser != null)
-                return Conflict(new { error = "Имя пользователя уже существует"});
-
-            var user = new User()
-            {
-                Id = Guid.NewGuid(),
-                Username = request.Username,
-                PasswordHash = _passwordHasher.HashPassword(request.Password)
-            };
-
-            await _userRepository.AddUserAsync(user);
+            var result = await _userService.CreateUserAsync(request.Username, request.Password);
             
-            return CreatedAtAction(
-                nameof(GetUser),
-                new { id = user.Id },
-                new UserResponse(user.Id, user.Username));
+            return CreatedAtAction(nameof(GetUser), new { id = result.Id }, result);
         }
         catch (Exception ex)
         {
@@ -55,15 +39,14 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUser(Guid id)
     {
         try
         {
-            var currentUser = await _userRepository.GetUserByIdAsync(id);
-            if (currentUser == null)
-                return NotFound();
-            
-            return Ok(new UserResponse(currentUser.Id, currentUser.Username));
+            var user = await _userService.GetUserByIdAsync(id);
+            return user != null ? Ok(user) : NotFound();
         }
         catch (Exception ex)
         {
@@ -72,31 +55,30 @@ public class UsersController : ControllerBase
         }
     }
     
+    [HttpGet("filter")]
+    [ProducesResponseType(typeof(IEnumerable<UserDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUsersByDate([FromQuery] UsersFilterRequest filter)
+    {
+        try
+        {
+            var users = await _userService.GetUsersByDateRangeAsync(filter.FromDate, filter.ToDate);
+            return Ok(users);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error filtering users");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+    
     [HttpPut("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateUser(Guid id, UpdateRequest request)
     {
         try
         {
-            var currentUser = await _userRepository.GetUserByIdAsync(id);
-            if (currentUser == null)
-                return NotFound();
-
-            if (!string.IsNullOrEmpty(request.Username))
-            {
-                var otherUser = await _userRepository.GetUserByUsernameAsync(request.Username);
-                if (otherUser != null && otherUser.Id != id)
-                    return BadRequest($"Username: {request.Username} уже существует");
-            }
-
-            var updatedUser = new User()
-            {
-                Id = id,
-                Username = request.Username ?? currentUser.Username,
-                PasswordHash = request.Password == null ? currentUser.PasswordHash : _passwordHasher.HashPassword(request.Password),
-            };
-    
-            await _userRepository.UpdateUserAsync(updatedUser);
-    
+            await _userService.UpdateUserAsync(id, request.Username, request.Password);
             return NoContent();
         }
         catch (Exception ex)
@@ -107,12 +89,13 @@ public class UsersController : ControllerBase
     }
     
     [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteUser(Guid id)
     {
         try
         {
-            await _userRepository.DeleteUserAsync(id);
-            
+            await _userService.DeleteUserAsync(id);
             return NoContent();
         }
         catch (Exception ex)

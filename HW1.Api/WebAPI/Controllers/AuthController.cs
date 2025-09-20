@@ -1,5 +1,4 @@
-using HW1.Api.Domain.Contracts.Repositories;
-using HW1.Api.Domain.Contracts.Security;
+using HW1.Api.Domain.Contracts.Services;
 using HW1.Api.WebAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,17 +8,12 @@ namespace HW1.Api.WebAPI.Controllers;
 [Route("api/auth")]
 public class AuthController : ControllerBase
 {
-    private readonly IUserRepository _userRepository;
-    private readonly IPasswordHasher _passwordHasher;
+    private readonly IAuthService _authService;
     private readonly ILogger<AuthController> _logger;
 
-    public AuthController(
-        IUserRepository userRepository,
-        IPasswordHasher passwordHasher,
-        ILogger<AuthController> logger)
+    public AuthController(IAuthService authService, ILogger<AuthController> logger)
     {
-        _userRepository = userRepository;
-        _passwordHasher = passwordHasher;
+        _authService = authService;
         _logger = logger;
     }
 
@@ -28,16 +22,14 @@ public class AuthController : ControllerBase
     {
         try
         {
-            var user = await _userRepository.GetUserByUsernameAsync(request.Username);
-            if (user == null)
-                return Unauthorized(new { error = "Invalid credentials" });
+            var result = await _authService.LoginAsync(request.Username, request.Password);
 
-            if (!_passwordHasher.VerifyHashedPassword(request.Password, user.PasswordHash))
-                return Unauthorized(new { error = "Invalid credentials" });
+            if (!result.IsSuccess)
+            {
+                return Unauthorized(new { error = result.Error });
+            }
             
-            return Ok(new LoginResponse(
-                user.Id.ToString(),
-                user.Username));
+            return Ok(new LoginResponse(result.UserId.ToString(), result.Username));
         }
         catch (Exception ex)
         {
