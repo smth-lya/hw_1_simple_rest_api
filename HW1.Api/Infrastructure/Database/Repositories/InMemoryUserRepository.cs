@@ -120,4 +120,10 @@ public class InMemoryUserRepository : IUserRepository
 
         return Task.CompletedTask;
     }
+    
+    public Task ClearAllAsync()
+    {
+        _users.Clear();
+        return Task.CompletedTask;
+    }
 }

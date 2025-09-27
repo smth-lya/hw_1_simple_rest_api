@@ -16,4 +16,6 @@ public interface IUserRepository
     Task AddUserAsync(User user, CancellationToken cancellationToken = default);
     Task UpdateUserAsync(User user, CancellationToken cancellationToken = default);
     Task DeleteUserAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    Task ClearAllAsync();
 }

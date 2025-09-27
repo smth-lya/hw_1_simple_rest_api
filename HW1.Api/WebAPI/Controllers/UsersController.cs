@@ -72,23 +72,6 @@ public class UsersController : ControllerBase
         }
     }
     
-    [HttpGet("paged-simple")]
-    public async Task<IActionResult> GetUsersPagedSimple(
-        [FromQuery] int pageNumber = 1, 
-        [FromQuery] int pageSize = 10)
-    {
-        try
-        {
-            var result = await _userService.GetUsersPagedAsync(pageNumber, pageSize);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка при получении пользователей");
-            return StatusCode(500, new { error = "Internal server error" });
-        }
-    }
-    
     [HttpGet("filter")]
     [ProducesResponseType(typeof(IEnumerable<UserDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUsersByDate([FromQuery] UsersFilterRequest filter)
