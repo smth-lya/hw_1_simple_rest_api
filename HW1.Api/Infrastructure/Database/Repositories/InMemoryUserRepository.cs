@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using HW1.Api.Domain.Contracts.Repositories;
 using HW1.Api.Domain.Models;
+using HW1.Api.WebAPI.Models;
 
 namespace HW1.Api.Infrastructure.Database.Repositories;
 
@@ -59,7 +60,30 @@ public class InMemoryUserRepository : IUserRepository
         
         return Task.FromResult(_users.Values.AsEnumerable());
     }
-    
+
+    public async Task<PagedResult<User>> GetUsersPagedAsync(PaginationRequest request)
+    {
+        return await GetUsersPagedAsync(request.PageNumber, request.PageSize);
+    }
+
+    public async Task<PagedResult<User>> GetUsersPagedAsync(int pageNumber, int pageSize)
+    {
+        await Task.CompletedTask;
+        
+        var items = _users.Values
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return new PagedResult<User>()
+        {
+            Items = items,
+            TotalCount = _users.Count,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+    }
+
     public Task AddUserAsync(User user, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

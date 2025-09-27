@@ -3,6 +3,7 @@ using HW1.Api.Domain.Contracts.Repositories;
 using HW1.Api.Domain.Contracts.Security;
 using HW1.Api.Domain.Contracts.Services;
 using HW1.Api.Domain.Models;
+using HW1.Api.WebAPI.Models;
 
 namespace HW1.Api.Application.Services;
 
@@ -42,12 +43,37 @@ public class UserService : IUserService
     {
         var user = await _userRepository.GetUserByUsernameAsync(username);
         return user != null ? UserDto.FromUser(user) : null;
-    } 
-    
+    }
+
     public async Task<IEnumerable<UserDto>> GetUsersByDateRangeAsync(DateTime? fromDate, DateTime? toDate)
     {
         var users = await _userRepository.GetUsersByDateRangeAsync(fromDate, toDate);
         return users.Select(UserDto.FromUser);
+    }
+    
+    public async Task<PagedResult<UserDto>> GetUsersPagedAsync(PaginationRequest request)
+    {
+        var pagedResult = await _userRepository.GetUsersPagedAsync(request);
+        
+        return new PagedResult<UserDto>
+        {
+            Items = pagedResult.Items.Select(UserDto.FromUser),
+            TotalCount = pagedResult.TotalCount,
+            PageNumber = pagedResult.PageNumber,
+            PageSize = pagedResult.PageSize
+        };    }
+
+    public async Task<PagedResult<UserDto>> GetUsersPagedAsync(int pageNumber, int pageSize)
+    {
+        var pagedResult = await _userRepository.GetUsersPagedAsync(pageNumber, pageSize);
+        
+        return new PagedResult<UserDto>
+        {
+            Items = pagedResult.Items.Select(UserDto.FromUser),
+            TotalCount = pagedResult.TotalCount,
+            PageNumber = pagedResult.PageNumber,
+            PageSize = pagedResult.PageSize
+        };
     }
 
     public async Task UpdateUserAsync(Guid id, string? username, string? password)

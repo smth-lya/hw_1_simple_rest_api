@@ -1,5 +1,6 @@
 using HW1.Api.Application.DTOs;
 using HW1.Api.Domain.Contracts.Services;
+using HW1.Api.Domain.Models;
 using HW1.Api.WebAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -51,6 +52,39 @@ public class UsersController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Не удалось получить пользователя {UserId}", id);
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    [HttpGet("paged")]
+    [ProducesResponseType(typeof(PagedResult<UserDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUsersPaged([FromQuery]PaginationRequest request)
+    {
+        try
+        {
+            var result = await _userService.GetUsersPagedAsync(request);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при получении пользователей");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+    
+    [HttpGet("paged-simple")]
+    public async Task<IActionResult> GetUsersPagedSimple(
+        [FromQuery] int pageNumber = 1, 
+        [FromQuery] int pageSize = 10)
+    {
+        try
+        {
+            var result = await _userService.GetUsersPagedAsync(pageNumber, pageSize);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при получении пользователей");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
