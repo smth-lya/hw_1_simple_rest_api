@@ -1,3 +1,4 @@
+using HW.Application.DTOs.Requests;
 using HW.WebAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 

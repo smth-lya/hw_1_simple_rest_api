@@ -1,4 +1,5 @@
 using HW.Application.DTOs;
+using HW.Application.DTOs.Responses;
 
 namespace HW.Application.Services;
 
@@ -25,25 +26,25 @@ public class UserService : IUserService
         };
 
         await _userRepository.AddUserAsync(user);
-        return UserDto.FromUser(user);
+        return UserDto.FromDomain(user);
     }
 
     public async Task<UserDto?> GetUserByIdAsync(Guid userId)
     {
         var user = await _userRepository.GetUserByIdAsync(userId);
-        return user != null ? UserDto.FromUser(user) : null;
+        return user != null ? UserDto.FromDomain(user) : null;
     }
 
     public async Task<UserDto?> GetUserByUsernameAsync(string username)
     {
         var user = await _userRepository.GetUserByUsernameAsync(username);
-        return user != null ? UserDto.FromUser(user) : null;
+        return user != null ? UserDto.FromDomain(user) : null;
     }
 
     public async Task<IEnumerable<UserDto>> GetUsersByDateRangeAsync(DateTime? fromDate, DateTime? toDate)
     {
         var users = await _userRepository.GetUsersByDateRangeAsync(fromDate, toDate);
-        return users.Select(UserDto.FromUser);
+        return users.Select(UserDto.FromDomain);
     }
     
     public async Task<PagedResult<UserDto>> GetUsersPagedAsync(PaginationRequest request)
@@ -52,7 +53,7 @@ public class UserService : IUserService
         
         return new PagedResult<UserDto>
         {
-            Items = pagedResult.Items.Select(UserDto.FromUser),
+            Items = pagedResult.Items.Select(UserDto.FromDomain),
             TotalCount = pagedResult.TotalCount,
             PageNumber = pagedResult.PageNumber,
             PageSize = pagedResult.PageSize
@@ -64,7 +65,7 @@ public class UserService : IUserService
         
         return new PagedResult<UserDto>
         {
-            Items = pagedResult.Items.Select(UserDto.FromUser),
+            Items = pagedResult.Items.Select(UserDto.FromDomain),
             TotalCount = pagedResult.TotalCount,
             PageNumber = pagedResult.PageNumber,
             PageSize = pagedResult.PageSize

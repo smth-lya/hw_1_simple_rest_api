@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace HW.Domain.Entities;
+namespace HW.Domain.ValueObjects;
 
 public record Username
 {
@@ -19,4 +19,7 @@ public record Username
         
         Value = value.Trim();
     }
+    
+    public static implicit operator string(Username username) => username.Value;
+
 }

@@ -1,4 +1,7 @@
-namespace HW.Application.DTOs;
+using HW.Domain.Entities;
+using HW.Domain.Models;
+
+namespace HW.Application.DTOs.Responses;
 
 public sealed record UserDto(Guid Id, string Username)
 {
@@ -6,7 +9,7 @@ public sealed record UserDto(Guid Id, string Username)
     public DateTime? CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
 
-    public static UserDto FromUser(User user) => new(user.Id, user.Username)
+    public static UserDto FromDomain(User user) => new(user.Id, user.Username)
     {
         Gender = user.Gender,
         

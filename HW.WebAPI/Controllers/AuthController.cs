@@ -1,3 +1,5 @@
+using HW.Application.Services.Interfaces;
+using HW.WebAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace HW.WebAPI.Controllers;

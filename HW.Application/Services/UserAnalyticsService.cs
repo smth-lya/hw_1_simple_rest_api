@@ -1,4 +1,5 @@
 using HW.Application.DTOs;
+using HW.Application.DTOs.Responses;
 
 namespace HW.Application.Services;
 
@@ -31,7 +32,7 @@ public class UserAnalyticsService : IUserAnalyticsService
             ? users.OrderBy(user => user.Username)
             : users.OrderByDescending(user => user.Username);
         
-        return sortedUsers.Select(UserDto.FromUser);
+        return sortedUsers.Select(UserDto.FromDomain);
     }
     
     public async Task<IEnumerable<UserDto>> GetUsersByGenderAsync(Gender gender)
@@ -40,7 +41,7 @@ public class UserAnalyticsService : IUserAnalyticsService
         return users.Where(user => 
             user.Gender != null && 
             user.Gender == gender)
-            .Select(UserDto.FromUser);
+            .Select(UserDto.FromDomain);
     }
     
     public async Task<int> GetTotalUsersCountAsync()

@@ -1,6 +1,7 @@
+using HW.Application.DTOs.Responses;
 using HW.Domain.Models;
 
-namespace HW.Domain.Contracts.Services;
+namespace HW.Application.Services.Interfaces;
 
 public interface IUserAnalyticsService
 {

@@ -1,4 +1,4 @@
-namespace HW.WebAPI.Models;
+namespace HW.Application.DTOs.Requests;
 
 public class PaginationRequest
 {
