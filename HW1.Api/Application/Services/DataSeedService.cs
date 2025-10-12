@@ -68,7 +68,7 @@ public class DataSeedService : IDataSeedService
             
             var user = new User
             {
-                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
                 Username = username,
                 PasswordHash = _passwordHasher.HashPassword("Password"),
                 Gender = genders[random.Next(genders.Length)],

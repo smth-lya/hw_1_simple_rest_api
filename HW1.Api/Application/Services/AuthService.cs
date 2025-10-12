@@ -27,6 +27,6 @@ public class AuthService : IAuthService
         var isPasswordValid = _passwordHasher.VerifyHashedPassword(password, user.PasswordHash);
         return !isPasswordValid 
             ? new LoginResult(IsSuccess: false, Error: "Недействительные учетные данные") 
-            : new LoginResult(IsSuccess: true, UserId: user.Id, Username: user.Username);
+            : new LoginResult(IsSuccess: true, UserId: user.UserId, Username: user.Username);
     }
 }

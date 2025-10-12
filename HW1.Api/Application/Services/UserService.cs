@@ -22,7 +22,7 @@ public class UserService : IUserService
     {
         var user = new User
         {
-            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
             Username = username,
             PasswordHash = _passwordHasher.HashPassword(password),
             CreatedAt = DateTime.UtcNow,
@@ -84,7 +84,7 @@ public class UserService : IUserService
 
         var updatedUser = new User()
         {
-            Id = id,
+            UserId = id,
             Username = username ?? user.Username,
             PasswordHash = password == null ? user.PasswordHash : _passwordHasher.HashPassword(password),
             CreatedAt = user.CreatedAt,

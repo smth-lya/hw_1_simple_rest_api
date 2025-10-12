@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace HW1.Api.Domain.Models;
 
-public sealed class User
+public class User
 {
     public User()
     { }
@@ -14,12 +14,21 @@ public sealed class User
         PasswordHash = passwordHash;
     }
     
-    public Guid Id { get; init; }
+    public Guid UserId { get; init; } = Guid.NewGuid();
     public required string Username { get; init; }
     public required string PasswordHash { get; init; }
     public Gender? Gender { get; init; }
-    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; init; } = DateTime.UtcNow;
+    
+    public DateOnly? DateOfBirth { get; set; }
+    public bool IsActive { get; set; } = true;
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? LastLoginAt { get; set; }
+    
+    public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+    public virtual UserProfile? UserProfile { get; set; }
+    public virtual ICollection<LoginAttempt> LoginAttempts { get; set; } = new List<LoginAttempt>();
 }
 
 public enum Gender

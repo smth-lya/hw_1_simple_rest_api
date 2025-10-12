@@ -89,9 +89,9 @@ public class InMemoryUserRepository : IUserRepository
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(user);
         
-        var added = _users.TryAdd(user.Id, user);
+        var added = _users.TryAdd(user.UserId, user);
         if (!added)
-            throw new InvalidOperationException($"Пользователь с ID {user.Id} уже существует");
+            throw new InvalidOperationException($"Пользователь с ID {user.UserId} уже существует");
 
         return Task.CompletedTask;
     }
@@ -101,11 +101,11 @@ public class InMemoryUserRepository : IUserRepository
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(user);
         
-        var existingUser = _users.GetValueOrDefault(user.Id);
+        var existingUser = _users.GetValueOrDefault(user.UserId);
         if (existingUser == null)
-            throw new InvalidOperationException($"Пользователь с ID {user.Id} не существует");
+            throw new InvalidOperationException($"Пользователь с ID {user.UserId} не существует");
         
-        _users[user.Id] = user;
+        _users[user.UserId] = user;
         
         return Task.CompletedTask;
     }

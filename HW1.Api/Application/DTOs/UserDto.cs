@@ -8,7 +8,7 @@ public sealed record UserDto(Guid Id, string Username)
     public DateTime? CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
 
-    public static UserDto FromUser(User user) => new(user.Id, user.Username)
+    public static UserDto FromUser(User user) => new(user.UserId, user.Username)
     {
         Gender = user.Gender,
         
