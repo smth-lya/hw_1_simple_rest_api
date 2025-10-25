@@ -1,9 +1,11 @@
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using HW1.Api.Application;
+using HW1.Api.Domain.Contracts.Telegram;
 using HW1.Api.Infrastructure;
 using HW1.Api.Infrastructure.Database;
 using HW1.Api.WebAPI.Extensions;
+using HW1.Api.WebAPI.TelegramBot.Commands;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +18,11 @@ builder.Services.AddCustomSwaggerGen();
 builder.Services
     .AddApplication(builder.Configuration)
     .AddInfrastructure(builder.Configuration);
+
+builder.Services.AddScoped<ICommandHandler, StartCommandHandler>();
+builder.Services.AddScoped<ICommandHandler, HelpCommandHandler>();
+builder.Services.AddScoped<ICommandHandler, StatsCommandHandler>();
+builder.Services.AddScoped<ICommandHandler, UsersCommandHandler>();
 
 var app = builder.Build();
 

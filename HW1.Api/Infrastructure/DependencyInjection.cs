@@ -1,8 +1,10 @@
 using HW1.Api.Domain.Contracts.Repositories;
 using HW1.Api.Domain.Contracts.Security;
+using HW1.Api.Domain.Contracts.Telegram;
 using HW1.Api.Infrastructure.Database;
 using HW1.Api.Infrastructure.Database.Repositories;
 using HW1.Api.Infrastructure.Security;
+using HW1.Api.Infrastructure.Telegram;
 using Microsoft.EntityFrameworkCore;
 
 namespace HW1.Api.Infrastructure;
@@ -14,6 +16,14 @@ public static class DependencyInjection
     {
         services.AddScoped<IPasswordHasher, DefaultPasswordHasher>();
         services.AddScoped<IUserRepository, EfUserRepository>();
+        
+        services.Configure<TelegramBotConfiguration>(
+            configuration.GetSection("TelegramBot"));
+        
+        services.AddScoped<ITelegramBotService, TelegramBotService>();
+        services.AddScoped<ITelegramUserService, TelegramUserService>();
+        
+        services.AddHostedService<TelegramBotBackgroundService>();
         
         services.AddDbContext<ApplicationDbContext>(options =>
         {
