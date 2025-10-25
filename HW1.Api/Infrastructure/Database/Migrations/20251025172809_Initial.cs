@@ -75,6 +75,31 @@ namespace HW1.Api.Infrastructure.Database.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "telegram_users",
+                columns: table => new
+                {
+                    telegram_user_id = table.Column<long>(type: "bigint", nullable: false),
+                    chat_id = table.Column<long>(type: "bigint", nullable: false),
+                    username = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    first_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    last_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    registered_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()"),
+                    last_activity = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()"),
+                    is_active = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
+                    system_user_id = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_telegram_users", x => x.telegram_user_id);
+                    table.ForeignKey(
+                        name: "FK_telegram_users_users_system_user_id",
+                        column: x => x.system_user_id,
+                        principalTable: "users",
+                        principalColumn: "user_id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "user_profiles",
                 columns: table => new
                 {
@@ -154,6 +179,32 @@ namespace HW1.Api.Infrastructure.Database.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "ix_telegram_users_chat_id",
+                table: "telegram_users",
+                column: "chat_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_telegram_users_is_active",
+                table: "telegram_users",
+                column: "is_active");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_telegram_users_system_user_id",
+                table: "telegram_users",
+                column: "system_user_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_telegram_users_telegram_user_id",
+                table: "telegram_users",
+                column: "telegram_user_id",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_telegram_users_username",
+                table: "telegram_users",
+                column: "username");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_user_profiles_user_id",
                 table: "user_profiles",
                 column: "user_id",
@@ -192,6 +243,9 @@ namespace HW1.Api.Infrastructure.Database.Migrations
         {
             migrationBuilder.DropTable(
                 name: "login_attempts");
+
+            migrationBuilder.DropTable(
+                name: "telegram_users");
 
             migrationBuilder.DropTable(
                 name: "user_profiles");

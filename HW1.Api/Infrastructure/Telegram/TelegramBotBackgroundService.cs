@@ -28,7 +28,6 @@ public class TelegramBotBackgroundService : BackgroundService
                 
                 await botService.StartAsync(stoppingToken);
                 
-                // Бот будет работать до отмены токена
                 await Task.Delay(Timeout.Infinite, stoppingToken);
             }
             catch (OperationCanceledException)

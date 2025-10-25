@@ -16,4 +16,5 @@ public interface IUserService
     
     Task UpdateUserAsync(Guid id, string? username, string? password);
     Task DeleteUserAsync(Guid id);
+    Task<int> GetTotalUsersCountAsync();
 }

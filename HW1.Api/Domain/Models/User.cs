@@ -34,5 +34,6 @@ public class User
 public enum Gender
 {
     Male,
-    Female
+    Female,
+    Undefined
 }

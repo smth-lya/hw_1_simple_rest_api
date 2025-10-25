@@ -98,4 +98,10 @@ public class UserService : IUserService
     {
         await _userRepository.DeleteUserAsync(id);
     }
+
+    public async Task<int> GetTotalUsersCountAsync()
+    {
+        var users = await _userRepository.GetAllUsersAsync().ConfigureAwait(false);
+        return users.Count();
+    }
 }

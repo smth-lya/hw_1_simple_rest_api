@@ -1,6 +1,7 @@
 using HW1.Api.Application.DTOs;
 using HW1.Api.Domain.Contracts.Services;
 using HW1.Api.Domain.Contracts.Telegram;
+using HW1.Api.Domain.Models;
 using HW1.Api.WebAPI.Models;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
@@ -24,7 +25,7 @@ public class UsersCommandHandler : BaseCommandHandler
         {
             await _botService.SendMessageAsync(
                 message.Chat.Id,
-                "❌ Доступ запрещен. Сначала выполните /start",
+                "Доступ запрещен. Сначала выполните /start",
                 cancellationToken);
             return;
         }
@@ -45,7 +46,7 @@ public class UsersCommandHandler : BaseCommandHandler
             {
                 await _botService.SendMessageAsync(
                     message.Chat.Id,
-                    "❌ Пользователи не найдены",
+                    "Пользователи не найдены",
                     cancellationToken);
                 return;
             }
@@ -53,13 +54,14 @@ public class UsersCommandHandler : BaseCommandHandler
             var usersList = FormatUsersList(usersPage.Items);
             var navigation = FormatNavigation(usersPage, pageNumber);
 
-            var messageText = $@"
-👥 <b>Пользователи системы</b>
+            var messageText = 
+                $@"""
+                👥 <b>Пользователи системы</b>
 
-{usersList}
+                {usersList}
 
-{navigation}
-            ".Trim();
+                {navigation}
+                """.Trim();
 
             var keyboard = CreateNavigationKeyboard(usersPage, pageNumber);
 
@@ -72,7 +74,7 @@ public class UsersCommandHandler : BaseCommandHandler
         {
             await _botService.SendMessageAsync(
                 message.Chat.Id,
-                "❌ Ошибка при получении списка пользователей",
+                "Ошибка при получении списка пользователей",
                 cancellationToken);
         }
     }
@@ -80,11 +82,10 @@ public class UsersCommandHandler : BaseCommandHandler
     private static string FormatUsersList(IEnumerable<UserDto> users)
     {
         return string.Join("\n\n", users.Select((user, index) => $@"
-{(index + 1)}. <b>{user.Username}</b>
-   📧 {user.Email}
-   👤 {GetGenderEmoji(user.Gender)}
-   📅 Зарегистрирован: {user.CreatedDate:dd.MM.yyyy}
-   🔧 Роли: {string.Join(", ", user.Roles)}".Trim()));
+        {(index + 1)}. <b>{user.Username}</b>
+           👤 {GetGenderEmoji(user.Gender)}
+           📅 Зарегистрирован: {user.CreatedAt:dd.MM.yyyy}
+           🔧 Роли: {string.Join(", ", ["User"])}".Trim()));
     }
 
     private static string FormatNavigation(PagedResult<UserDto> page, int currentPage)
@@ -92,7 +93,7 @@ public class UsersCommandHandler : BaseCommandHandler
         return $@"
 📄 Страница {currentPage} из {page.TotalPages}
 👤 Всего пользователей: {page.TotalCount}
-        ".Trim();
+".Trim();
     }
 
     private static InlineKeyboardMarkup? CreateNavigationKeyboard(PagedResult<UserDto> page, int currentPage)
@@ -112,10 +113,10 @@ public class UsersCommandHandler : BaseCommandHandler
         return buttons.Any() ? new InlineKeyboardMarkup(buttons) : null;
     }
 
-    private static string GetGenderEmoji(string? gender) => gender?.ToUpper() switch
+    private static string GetGenderEmoji(Gender? gender) => gender switch
     {
-        "M" => "👨",
-        "F" => "👩",
+        Gender.Male => "👨",
+        Gender.Female => "👩",
         _ => "❓"
     };
 }

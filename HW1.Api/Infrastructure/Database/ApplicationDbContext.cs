@@ -14,6 +14,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<UserRole> UserRoles { get; set; }
     public DbSet<UserProfile> UserProfiles { get; set; }
     public DbSet<LoginAttempt> LoginAttempts { get; set; }
+    public DbSet<TelegramUser> TelegramUsers => Set<TelegramUser>(); 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

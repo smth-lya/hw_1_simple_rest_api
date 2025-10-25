@@ -6,7 +6,7 @@ namespace HW1.Api.WebAPI.TelegramBot.Commands;
 
 public class HelpCommandHandler : BaseCommandHandler
 {
-    private readonly IEnumerable<ICommandHandler> _commandHandlers;
+    private readonly Func<IEnumerable<ICommandHandler>> _commandHandlersFactory;
 
     public override string Command => "/help";
     public override string Description => "Помощь и список команд";
@@ -15,10 +15,10 @@ public class HelpCommandHandler : BaseCommandHandler
         ITelegramBotService botService,
         IUserService userService,
         ITelegramUserService telegramUserService,
-        IEnumerable<ICommandHandler> commandHandlers)
+        Func<IEnumerable<ICommandHandler>> commandHandlersFactory) 
         : base(botService, userService, telegramUserService)
     {
-        _commandHandlers = commandHandlers;
+        _commandHandlersFactory = commandHandlersFactory;
     }
 
     public override async Task HandleAsync(Message message, CancellationToken cancellationToken)
@@ -39,7 +39,7 @@ public class HelpCommandHandler : BaseCommandHandler
     {
         var helpMessage = "📋 <b>Доступные команды:</b>\n\n";
         
-        foreach (var handler in _commandHandlers.OrderBy(h => h.Command))
+        foreach (var handler in _commandHandlersFactory().OrderBy(h => h.Command)!)
         {
             helpMessage += $"<code>{handler.Command}</code> - {handler.Description}\n";
         }
@@ -51,14 +51,14 @@ public class HelpCommandHandler : BaseCommandHandler
 
     private async Task ShowCommandHelpAsync(long chatId, string command, CancellationToken cancellationToken)
     {
-        var handler = _commandHandlers.FirstOrDefault(h => 
+        var handler = _commandHandlersFactory().FirstOrDefault(h => 
             h.Command.Equals(command, StringComparison.OrdinalIgnoreCase));
 
         if (handler == null)
         {
             await _botService.SendMessageAsync(
                 chatId,
-                $"❌ Команда <code>{command}</code> не найдена.\nИспользуйте /help для списка команд.",
+                $"Команда <code>{command}</code> не найдена.\nИспользуйте /help для списка команд.",
                 cancellationToken);
             return;
         }
@@ -70,7 +70,7 @@ public class HelpCommandHandler : BaseCommandHandler
     private static string GetCommandSpecificHelp(string command) => command.ToLower() switch
     {
         "/start" => @"
-🎯 <b>Команда /start</b>
+<b>Команда /start</b>
 
 Запускает бота и регистрирует пользователя в системе.
 
@@ -80,7 +80,7 @@ public class HelpCommandHandler : BaseCommandHandler
 После выполнения команды вы получите приветственное сообщение и доступ ко всем функциям бота.
         ",
         "/stats" => @"
-📊 <b>Команда /stats</b>
+<b>Команда /stats</b>
 
 Показывает статистику системы:
 - Общее количество пользователей
@@ -92,15 +92,15 @@ public class HelpCommandHandler : BaseCommandHandler
 <code>/stats</code>
         ",
         "/users" => @"
-👥 <b>Команда /users</b>
+<b>Команда /users</b>
 
 Показывает список пользователей системы с возможностью постраничного просмотра.
 
 <b>Использование:</b>
 <code>/users</code> - первая страница
 <code>/users 2</code> - вторая страница
-        ",
-        _ => $"📖 Помощь по команде {command}\n\nОписание: {GetHandlerDescription(command)}"
+",
+        _ => $"Помощь по команде {command}\n\nОписание: {GetHandlerDescription(command)}"
     };
 
     private static string GetHandlerDescription(string command) => command.ToLower() switch

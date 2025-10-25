@@ -3,7 +3,6 @@ using System;
 using HW1.Api.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,11 +11,9 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HW1.Api.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251012160423_Initial")]
-    partial class Initial
+    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -133,6 +130,74 @@ namespace HW1.Api.Infrastructure.Database.Migrations
                             Description = "VIP user with additional privileges",
                             RoleName = "VIP"
                         });
+                });
+
+            modelBuilder.Entity("HW1.Api.Domain.Models.TelegramUser", b =>
+                {
+                    b.Property<long>("TelegramUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("telegram_user_id");
+
+                    b.Property<long>("ChatId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("chat_id");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("first_name");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTime>("LastActivity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_activity")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("LastName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_name");
+
+                    b.Property<DateTime>("RegisteredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("registered_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid?>("SystemUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("system_user_id");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("username");
+
+                    b.HasKey("TelegramUserId");
+
+                    b.HasIndex("ChatId")
+                        .HasDatabaseName("ix_telegram_users_chat_id");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("ix_telegram_users_is_active");
+
+                    b.HasIndex("SystemUserId");
+
+                    b.HasIndex("TelegramUserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_telegram_users_telegram_user_id");
+
+                    b.HasIndex("Username")
+                        .HasDatabaseName("ix_telegram_users_username");
+
+                    b.ToTable("telegram_users", (string)null);
                 });
 
             modelBuilder.Entity("HW1.Api.Domain.Models.User", b =>
@@ -296,6 +361,16 @@ namespace HW1.Api.Infrastructure.Database.Migrations
                         .HasConstraintName("fk_login_attempts_users");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("HW1.Api.Domain.Models.TelegramUser", b =>
+                {
+                    b.HasOne("HW1.Api.Domain.Models.User", "SystemUser")
+                        .WithMany()
+                        .HasForeignKey("SystemUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("SystemUser");
                 });
 
             modelBuilder.Entity("HW1.Api.Domain.Models.UserProfile", b =>

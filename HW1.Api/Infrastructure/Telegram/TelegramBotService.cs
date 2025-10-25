@@ -1,4 +1,5 @@
 using HW1.Api.Domain.Contracts.Telegram;
+using HW1.Api.WebAPI.TelegramBot.Commands;
 using Microsoft.Extensions.Options;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
@@ -14,20 +15,20 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
     private readonly TelegramBotConfiguration _config;
     private readonly ILogger<TelegramBotService> _logger;
     private readonly IServiceProvider _serviceProvider;
-    private readonly IEnumerable<ICommandHandler> _commandHandlers;
+    private readonly Func<IEnumerable<ICommandHandler>> _commandHandlersFactory; 
 
-    private CancellationTokenSource _cancellationTokenSource = new();
+    private readonly CancellationTokenSource _cancellationTokenSource = new();
 
     public TelegramBotService(
         IOptions<TelegramBotConfiguration> config,
         ILogger<TelegramBotService> logger,
         IServiceProvider serviceProvider,
-        IEnumerable<ICommandHandler> commandHandlers)
+        Func<IEnumerable<ICommandHandler>> commandHandlersFactory)
     {
         _config = config.Value;
         _logger = logger;
         _serviceProvider = serviceProvider;
-        _commandHandlers = commandHandlers;
+        _commandHandlersFactory = commandHandlersFactory;
         
         _botClient = new TelegramBotClient(_config.BotToken);
     }
@@ -52,11 +53,11 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
     {
         _logger.LogInformation("Stopping Telegram Bot...");
         
-        _cancellationTokenSource.Cancel();
+        await _cancellationTokenSource.CancelAsync();
         
         if (_config.UseWebhook)
         {
-            await _botClient.DeleteWebhookAsync(cancellationToken: cancellationToken);
+            await _botClient.DeleteWebhook(cancellationToken: cancellationToken);
         }
 
         _logger.LogInformation("Telegram Bot stopped");
@@ -71,7 +72,7 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
                 message = message[.._config.MaxMessageLength] + "...";
             }
 
-            await _botClient.SendTextMessageAsync(
+            await _botClient.SendMessage(
                 chatId,
                 message,
                 parseMode: ParseMode.Html,
@@ -85,8 +86,7 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
 
     public async Task BroadcastMessageAsync(string message, CancellationToken cancellationToken = default)
     {
-        // Реализация массовой рассылки
-        // В реальном приложении здесь бы получали список всех активных пользователей
+        // массовая рассылка
         _logger.LogInformation("Broadcast message: {Message}", message);
         await Task.CompletedTask;
     }
@@ -108,7 +108,7 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
         }
     }
 
-    public async Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
+    public async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
     {
         var errorMessage = exception switch
         {
@@ -119,7 +119,6 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
 
         _logger.LogError(exception, "Polling error occurred");
 
-        // Ждем перед повторным подключением
         await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
     }
 
@@ -131,8 +130,19 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
         _logger.LogInformation("Received message from {UserId}: {Text}", message.From?.Id, messageText);
 
         using var scope = _serviceProvider.CreateScope();
-        var commandHandlers = scope.ServiceProvider.GetRequiredService<IEnumerable<ICommandHandler>>();
+    
+        // Проверяем, находится ли пользователь в процессе регистрации
+        var registerHandler = scope.ServiceProvider.GetRequiredService<RegisterCommandHandler>();
+    
+        // Если пользователь в процессе регистрации, обрабатываем шаг
+        if (await registerHandler.IsUserInRegistrationAsync(message.From.Id) && 
+            !messageText.StartsWith("/"))
+        {
+            await registerHandler.HandleRegistrationStepAsync(message, _cancellationTokenSource.Token);
+            return;
+        }
 
+        var commandHandlers = scope.ServiceProvider.GetRequiredService<IEnumerable<ICommandHandler>>();
         var commandHandler = commandHandlers.FirstOrDefault(handler => 
             messageText.StartsWith(handler.Command, StringComparison.OrdinalIgnoreCase));
 
@@ -166,11 +176,8 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
     private async Task HandleUnknownCommand(Message message)
     {
         var response = @"
-❌ Неизвестная команда.
-
-Для просмотра доступных команд используйте /help
-
-Если вам нужна помощь, обратитесь к администратору.
+        Неизвестная команда.
+        Для просмотра доступных команд используйте /help
         ".Trim();
 
         await SendMessageAsync(message.Chat.Id, response);
@@ -178,18 +185,37 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
 
     private async Task SetWebhookAsync(CancellationToken cancellationToken)
     {
-        await _botClient.SetWebhookAsync(
-            url: _config.WebhookUrl,
-            cancellationToken: cancellationToken);
-        
-        _logger.LogInformation("Webhook set to: {WebhookUrl}", _config.WebhookUrl);
+        if (!_config.UseWebhook || string.IsNullOrEmpty(_config.WebhookUrl))
+        {
+            _logger.LogWarning("Webhook is not configured");
+            return;
+        }
+
+        try
+        {
+            await _botClient.SetWebhook(
+                url: _config.WebhookUrl,
+                allowedUpdates: Array.Empty<UpdateType>(),
+                cancellationToken: cancellationToken);
+
+            _logger.LogInformation("Webhook set to: {WebhookUrl}", _config.WebhookUrl);
+            
+            var webhookInfo = await _botClient.GetWebhookInfo(cancellationToken);
+            _logger.LogInformation("Webhook info: {Url}, Pending updates: {PendingUpdatesCount}", 
+                webhookInfo.Url, webhookInfo.PendingUpdateCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to set webhook");
+            throw;
+        }
     }
 
     private async Task StartPollingAsync(CancellationToken cancellationToken)
     {
         var receiverOptions = new ReceiverOptions
         {
-            AllowedUpdates = Array.Empty<UpdateType>(),
+            AllowedUpdates = [],
             DropPendingUpdates = true,
         };
 

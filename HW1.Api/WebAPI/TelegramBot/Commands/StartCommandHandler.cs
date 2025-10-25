@@ -39,13 +39,13 @@ public class StartCommandHandler : BaseCommandHandler
 /stats - Статистика системы
 /register - Регистрация в системе
 
-💡 Для получения помощи по конкретной команде используйте /help [команда]
-        ".Trim();
+Для получения помощи по конкретной команде используйте /help [команда]
+".Trim();
 
         var keyboard = new ReplyKeyboardMarkup(new[]
         {
-            new[] { new KeyboardButton("📊 Статистика"), new KeyboardButton("👥 Пользователи") },
-            new[] { new KeyboardButton("👤 Мой профиль"), new KeyboardButton("ℹ️ Помощь") }
+            new[] { new KeyboardButton("Статистика"), new KeyboardButton("Пользователи") },
+            new[] { new KeyboardButton("Мой профиль"), new KeyboardButton("ℹПомощь") }
         })
         {
             ResizeKeyboard = true
