@@ -46,7 +46,7 @@ public class TelegramUserService : ITelegramUserService
             IsActive = true
         };
 
-        _context.Set<TelegramUser>().Add(newUser);
+        _context.TelegramUsers.Add(newUser);
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("New Telegram user registered: {UserId} ({Username})", telegramUserId, username);
@@ -75,5 +75,67 @@ public class TelegramUserService : ITelegramUserService
     {
         return await _context.Set<TelegramUser>()
             .AnyAsync(u => u.TelegramUserId == telegramUserId && u.IsActive);
+    }
+
+    public async Task LinkToSystemUserAsync(long telegramUserId, Guid systemUserId)
+    {
+        try
+        {
+            var telegramUser = await _context.TelegramUsers
+                .FirstOrDefaultAsync(u => u.TelegramUserId == telegramUserId);
+
+            if (telegramUser == null)
+            {
+                throw new InvalidOperationException($"Telegram user {telegramUserId} not found");
+            }
+
+            // Проверяем, существует ли системный пользователь
+            var systemUser = await _context.Users
+                .AnyAsync(u => u.UserId == systemUserId);
+                
+            if (!systemUser)
+            {
+                throw new InvalidOperationException($"System user {systemUserId} not found");
+            }
+
+            // Проверяем, не привязан ли уже этот Telegram аккаунт к другому пользователю
+            var existingLink = await _context.TelegramUsers
+                .AnyAsync(u => u.SystemUserId == systemUserId && u.TelegramUserId != telegramUserId);
+                
+            if (existingLink)
+            {
+                throw new InvalidOperationException($"System user {systemUserId} is already linked to another Telegram account");
+            }
+
+            telegramUser.SystemUserId = systemUserId;
+            telegramUser.LastActivity = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation("Telegram user {TelegramUserId} linked to system user {SystemUserId}", 
+                telegramUserId, systemUserId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error linking Telegram user {TelegramUserId} to system user {SystemUserId}", 
+                telegramUserId, systemUserId);
+            throw;
+        }
+    }
+
+    public async Task UnlinkFromSystemUserAsync(long telegramUserId)
+    {
+        var telegramUser = await _context.TelegramUsers
+            .FirstOrDefaultAsync(u => u.TelegramUserId == telegramUserId);
+
+        if (telegramUser != null && telegramUser.SystemUserId.HasValue)
+        {
+            telegramUser.SystemUserId = null;
+            telegramUser.LastActivity = DateTime.UtcNow;
+            
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation("Telegram user {TelegramUserId} unlinked from system user", telegramUserId);
+        }
     }
 }

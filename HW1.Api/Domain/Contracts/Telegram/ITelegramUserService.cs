@@ -9,4 +9,6 @@ public interface ITelegramUserService
     Task UpdateUserActivityAsync(long telegramUserId);
     Task<int> GetActiveUsersCountAsync();
     Task<bool> IsUserRegisteredAsync(long telegramUserId);
+    Task LinkToSystemUserAsync(long telegramUserId, Guid systemUserId);
+    Task UnlinkFromSystemUserAsync(long telegramUserId);
 }

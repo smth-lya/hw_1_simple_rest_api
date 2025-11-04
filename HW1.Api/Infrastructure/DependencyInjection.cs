@@ -20,6 +20,9 @@ public static class DependencyInjection
         services.Configure<TelegramBotConfiguration>(
             configuration.GetSection("TelegramBot"));
         
+        services.AddScoped<IRegistrationStorage, RegistrationStorage>();
+
+        
         services.AddDbContext<ApplicationDbContext>(options =>
         {
             options.UseNpgsql(configuration.GetConnectionString("PostgresConnection"));

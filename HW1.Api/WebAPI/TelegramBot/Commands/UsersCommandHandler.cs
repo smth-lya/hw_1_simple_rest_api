@@ -24,9 +24,9 @@ public class UsersCommandHandler : BaseCommandHandler
         if (!await ValidateUserAccessAsync(message.From.Id, cancellationToken))
         {
             await _botService.SendMessageAsync(
-                message.Chat.Id,
+                message.Chat.Id, 
                 "Доступ запрещен. Сначала выполните /start",
-                cancellationToken);
+                cancellationToken: cancellationToken);
             return;
         }
 
@@ -45,37 +45,33 @@ public class UsersCommandHandler : BaseCommandHandler
             if (!usersPage.Items.Any())
             {
                 await _botService.SendMessageAsync(
-                    message.Chat.Id,
-                    "Пользователи не найдены",
-                    cancellationToken);
+                    message.Chat.Id, 
+                    "Пользователи не найдены", 
+                    cancellationToken: cancellationToken);
                 return;
             }
 
             var usersList = FormatUsersList(usersPage.Items);
             var navigation = FormatNavigation(usersPage, pageNumber);
 
-            var messageText = 
-                $@"""
-                👥 <b>Пользователи системы</b>
+            var messageText = $"""
+                               <b>Пользователи системы</b>
 
-                {usersList}
+                               {usersList}
 
-                {navigation}
-                """.Trim();
+                               {navigation}
+                               """.Trim();
 
             var keyboard = CreateNavigationKeyboard(usersPage, pageNumber);
 
-            await _botService.SendMessageAsync(
-                message.Chat.Id,
-                messageText,
-                cancellationToken);
+            await _botService.SendMessageAsync(message.Chat.Id, messageText, keyboard, cancellationToken: cancellationToken);
         }
         catch (Exception ex)
         {
             await _botService.SendMessageAsync(
                 message.Chat.Id,
-                "Ошибка при получении списка пользователей",
-                cancellationToken);
+                "Ошибка при получении списка пользователей", 
+                cancellationToken: cancellationToken);
         }
     }
 
@@ -83,17 +79,17 @@ public class UsersCommandHandler : BaseCommandHandler
     {
         return string.Join("\n\n", users.Select((user, index) => $@"
         {(index + 1)}. <b>{user.Username}</b>
-           👤 {GetGenderEmoji(user.Gender)}
-           📅 Зарегистрирован: {user.CreatedAt:dd.MM.yyyy}
-           🔧 Роли: {string.Join(", ", ["User"])}".Trim()));
+           {GetGenderEmoji(user.Gender)}
+           Зарегистрирован: {user.CreatedAt:dd.MM.yyyy}
+           Роли: {string.Join(", ", ["User"])}".Trim()));
     }
 
     private static string FormatNavigation(PagedResult<UserDto> page, int currentPage)
     {
-        return $@"
-📄 Страница {currentPage} из {page.TotalPages}
-👤 Всего пользователей: {page.TotalCount}
-".Trim();
+        return $"""
+                Страница {currentPage} из {page.TotalPages}
+                Всего пользователей: {page.TotalCount}
+                """.Trim();
     }
 
     private static InlineKeyboardMarkup? CreateNavigationKeyboard(PagedResult<UserDto> page, int currentPage)
@@ -110,7 +106,7 @@ public class UsersCommandHandler : BaseCommandHandler
             buttons.Add(InlineKeyboardButton.WithCallbackData("Вперед ➡️", $"/users {currentPage + 1}"));
         }
 
-        return buttons.Any() ? new InlineKeyboardMarkup(buttons) : null;
+        return buttons.Count != 0 ? new InlineKeyboardMarkup(buttons) : null;
     }
 
     private static string GetGenderEmoji(Gender? gender) => gender switch

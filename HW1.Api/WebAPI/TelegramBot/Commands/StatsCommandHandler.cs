@@ -27,23 +27,23 @@ public class StatsCommandHandler : BaseCommandHandler
         if (!await ValidateUserAccessAsync(message.From.Id, cancellationToken))
         {
             await _botService.SendMessageAsync(
-                message.Chat.Id,
+                message.Chat.Id, 
                 "Доступ запрещен. Сначала выполните /start",
-                cancellationToken);
+                cancellationToken: cancellationToken);
             return;
         }
 
         try
         {
             var stats = await GetSystemStatsAsync();
-            await _botService.SendMessageAsync(message.Chat.Id, stats, cancellationToken);
+            await _botService.SendMessageAsync(message.Chat.Id, stats, cancellationToken: cancellationToken);
         }
         catch (Exception ex)
         {
             await _botService.SendMessageAsync(
-                message.Chat.Id,
-                "Ошибка при получении статистики",
-                cancellationToken);
+                message.Chat.Id, 
+                "Ошибка при получении статистики", 
+                cancellationToken: cancellationToken);
         }
     }
 
@@ -56,23 +56,23 @@ public class StatsCommandHandler : BaseCommandHandler
         var telegramUsersCount = await _telegramUserService.GetActiveUsersCountAsync();
 
         var statsMessage = 
-@$"""
-📊 <b>Статистика системы</b>
+            $"""
+                 <b>Статистика системы</b>
 
-<b>Пользователи системы:</b> {totalUsers}
-<b>Пользователи бота:</b> {telegramUsersCount}
+                 <b>Пользователи системы:</b> {totalUsers}
+                 <b>Пользователи бота:</b> {telegramUsersCount}
 
-<b>По полу:</b>
-    👨 Мужчины: {genderStats.GetValueOrDefault(Gender.Male, 0)}
-    👩 Женщины: {genderStats.GetValueOrDefault(Gender.Female, 0)}
-    ❓ Не указан: {genderStats.GetValueOrDefault(Gender.Undefined, 0)}
+                 <b>По полу:</b>
+                     Мужчины: {genderStats.GetValueOrDefault(Gender.Male, 0)}
+                     Женщины: {genderStats.GetValueOrDefault(Gender.Female, 0)}
+                     Не указан: {genderStats.GetValueOrDefault(Gender.Undefined, 0)}
 
-<b>Даты регистрации:</b>
-    🏁 Первая: {earliestDate:dd.MM.yyyy}
-    🎯 Последняя: {latestDate:dd.MM.yyyy}
+                 <b>Даты регистрации:</b>
+                     Первая: {earliestDate:dd.MM.yyyy}
+                     Последняя: {latestDate:dd.MM.yyyy}
 
-<b>Обновлено:</b> {DateTime.Now:dd.MM.yyyy HH:mm}
-""".Trim();
+                 <b>Обновлено:</b> {DateTime.Now:dd.MM.yyyy HH:mm}
+                 """.Trim();
 
         return statsMessage;
     }

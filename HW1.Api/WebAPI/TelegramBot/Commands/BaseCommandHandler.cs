@@ -33,6 +33,6 @@ public abstract class BaseCommandHandler : ICommandHandler
     protected async Task<bool> ValidateUserAccessAsync(long telegramUserId, CancellationToken cancellationToken)
     {
         var user = await _telegramUserService.GetUserAsync(telegramUserId);
-        return user != null && user.IsActive;
+        return user is { IsActive: true };
     }
 }

@@ -23,20 +23,14 @@ public class ProfileCommandHandler : BaseCommandHandler
     {
         if (!await ValidateUserAccessAsync(message.From.Id, cancellationToken))
         {
-            await _botService.SendMessageAsync(
-                message.Chat.Id,
-                "❌ Сначала выполните /start для регистрации в боте",
-                cancellationToken);
+            await _botService.SendMessageAsync(message.Chat.Id, "❌ Сначала выполните /start для регистрации в боте", cancellationToken: cancellationToken);
             return;
         }
 
         var telegramUser = await _telegramUserService.GetUserAsync(message.From.Id);
         if (telegramUser == null)
         {
-            await _botService.SendMessageAsync(
-                message.Chat.Id,
-                "❌ Пользователь не найден. Выполните /start",
-                cancellationToken);
+            await _botService.SendMessageAsync(message.Chat.Id, "❌ Пользователь не найден. Выполните /start", cancellationToken: cancellationToken);
             return;
         }
 
@@ -45,17 +39,11 @@ public class ProfileCommandHandler : BaseCommandHandler
             var profileMessage = await BuildProfileMessageAsync(telegramUser, message.From);
             var keyboard = CreateProfileKeyboard(telegramUser);
 
-            await _botService.SendMessageAsync(
-                message.Chat.Id,
-                profileMessage,
-                cancellationToken);
+            await _botService.SendMessageAsync(message.Chat.Id, profileMessage, keyboard, cancellationToken);
         }
         catch (Exception ex)
         {
-            await _botService.SendMessageAsync(
-                message.Chat.Id,
-                "❌ Ошибка при загрузке профиля",
-                cancellationToken);
+            await _botService.SendMessageAsync(message.Chat.Id, "❌ Ошибка при загрузке профиля", cancellationToken: cancellationToken);
         }
     }
 
@@ -67,15 +55,15 @@ public class ProfileCommandHandler : BaseCommandHandler
         profile.AppendLine();
 
         // Информация из Telegram
-        profile.AppendLine("📱 <b>Telegram данные:</b>");
-        profile.AppendLine($"   🆔 ID: <code>{telegramUser.TelegramUserId}</code>");
-        profile.AppendLine($"   👤 Имя: {telegramFrom.FirstName} {telegramFrom.LastName}".Trim());
+        profile.AppendLine("<b>Telegram данные:</b>");
+        profile.AppendLine($"   ID: <code>{telegramUser.TelegramUserId}</code>");
+        profile.AppendLine($"   Имя: {telegramFrom.FirstName} {telegramFrom.LastName}");
         
         if (!string.IsNullOrEmpty(telegramUser.Username))
-            profile.AppendLine($"   📝 Username: @{telegramUser.Username}");
+            profile.AppendLine($"   Username: @{telegramUser.Username}");
         
-        profile.AppendLine($"   📅 Зарегистрирован: {telegramUser.RegisteredAt:dd.MM.yyyy HH:mm}");
-        profile.AppendLine($"   ⏰ Последняя активность: {telegramUser.LastActivity:dd.MM.yyyy HH:mm}");
+        profile.AppendLine($"   Зарегистрирован: {telegramUser.RegisteredAt:dd.MM.yyyy HH:mm}");
+        profile.AppendLine($"   Последняя активность: {telegramUser.LastActivity:dd.MM.yyyy HH:mm}");
         profile.AppendLine();
 
         // Информация из системы
@@ -84,11 +72,11 @@ public class ProfileCommandHandler : BaseCommandHandler
             var systemUser = await _userService.GetUserByIdAsync(telegramUser.SystemUserId.Value);
             if (systemUser != null)
             {
-                profile.AppendLine("🌐 <b>Данные системы:</b>");
-                profile.AppendLine($"   🆔 System ID: <code>{systemUser.Id}</code>");
-                profile.AppendLine($"   👤 Username: <code>{systemUser.Username}</code>");
-                profile.AppendLine($"   📅 Регистрация: {systemUser.CreatedAt:dd.MM.yyyy}");
-                profile.AppendLine($"   🔄 Обновлен: {systemUser.UpdatedAt:dd.MM.yyyy}");
+                profile.AppendLine("<b>Данные системы:</b>");
+                profile.AppendLine($"   System ID: <code>{systemUser.Id}</code>");
+                profile.AppendLine($"   Username: <code>{systemUser.Username}</code>");
+                profile.AppendLine($"   Регистрация: {systemUser.CreatedAt:dd.MM.yyyy}");
+                profile.AppendLine($"   Обновлен: {systemUser.UpdatedAt:dd.MM.yyyy}");
                 
                 // if (systemUser.Roles.Any())
                 //     profile.AppendLine($"   🎯 Роли: {string.Join(", ", systemUser.Roles)}");
@@ -102,38 +90,38 @@ public class ProfileCommandHandler : BaseCommandHandler
 
         // Статистика
         profile.AppendLine();
-        profile.AppendLine("📊 <b>Статистика:</b>");
+        profile.AppendLine("<b>Статистика:</b>");
         
         var totalUsers = await _userService.GetTotalUsersCountAsync();
         var activeTelegramUsers = await _telegramUserService.GetActiveUsersCountAsync();
         
-        profile.AppendLine($"   👥 Всего пользователей в системе: {totalUsers}");
-        profile.AppendLine($"   🤖 Пользователей бота: {activeTelegramUsers}");
+        profile.AppendLine($"   Всего пользователей в системе: {totalUsers}");
+        profile.AppendLine($"   Пользователей бота: {activeTelegramUsers}");
 
         return profile.ToString();
     }
 
-    private static InlineKeyboardMarkup CreateProfileKeyboard(TelegramUser telegramUser)
+    private InlineKeyboardMarkup CreateProfileKeyboard(TelegramUser telegramUser)
     {
         var buttons = new List<InlineKeyboardButton[]>();
 
         if (!telegramUser.SystemUserId.HasValue)
         {
             buttons.Add([
-                InlineKeyboardButton.WithCallbackData("🚀 Зарегистрироваться в системе", "register_from_profile")
+                InlineKeyboardButton.WithCallbackData("🚀 Зарегистрироваться в системе", $"{Command} register_from_profile")
             ]);
         }
         else
         {
             buttons.Add([
-                InlineKeyboardButton.WithCallbackData("🔄 Обновить профиль", "refresh_profile"),
-                InlineKeyboardButton.WithCallbackData("✏️ Редактировать", "edit_profile")
+                InlineKeyboardButton.WithCallbackData("🔄 Обновить профиль", $"{Command} refresh_profile"),
+                InlineKeyboardButton.WithCallbackData("✏️ Редактировать", $"{Command} edit_profile")
             ]);
         }
 
         buttons.Add([
-            InlineKeyboardButton.WithCallbackData("📊 Статистика", "show_stats"),
-            InlineKeyboardButton.WithCallbackData("👥 Пользователи", "show_users")
+            InlineKeyboardButton.WithCallbackData("📊 Статистика", $"{Command} show_stats"),
+            InlineKeyboardButton.WithCallbackData("👥 Пользователи", $"{Command} show_users")
         ]);
 
         return new InlineKeyboardMarkup(buttons);
@@ -141,7 +129,9 @@ public class ProfileCommandHandler : BaseCommandHandler
 
     public override async Task HandleCallbackAsync(CallbackQuery callbackQuery, CancellationToken cancellationToken)
     {
-        switch (callbackQuery.Data)
+        var data = callbackQuery.Data.Split()[1];
+        
+        switch (data)
         {
             case "refresh_profile":
                 await HandleRefreshProfile(callbackQuery, cancellationToken);
@@ -163,6 +153,8 @@ public class ProfileCommandHandler : BaseCommandHandler
                 await HandleShowUsers(callbackQuery, cancellationToken);
                 break;
         }
+        
+        await _botService.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: cancellationToken);
     }
 
     private async Task HandleRefreshProfile(CallbackQuery callbackQuery, CancellationToken cancellationToken)
@@ -177,19 +169,13 @@ public class ProfileCommandHandler : BaseCommandHandler
             var profileMessage = await BuildProfileMessageAsync(telegramUser, callbackQuery.From);
             var keyboard = CreateProfileKeyboard(telegramUser);
 
-            await _botService.SendMessageAsync(
-                callbackQuery.Message.Chat.Id,
-                "✅ Профиль обновлен!\n\n" + profileMessage,
-                cancellationToken);
+            await _botService.SendMessageAsync(callbackQuery.Message.Chat.Id, "✅ Профиль обновлен!\n\n" + profileMessage, keyboard, cancellationToken: cancellationToken);
         }
     }
 
     private async Task HandleRegisterFromProfile(CallbackQuery callbackQuery, CancellationToken cancellationToken)
     {
-        await _botService.SendMessageAsync(
-            callbackQuery.Message.Chat.Id,
-            "🚀 Начинаем регистрацию в системе...",
-            cancellationToken);
+        await _botService.SendMessageAsync(callbackQuery.Message.Chat.Id, "🚀 Начинаем регистрацию в системе...", cancellationToken: cancellationToken);
 
         // Имитируем отправку команды register
         var message = new Message
@@ -204,20 +190,14 @@ public class ProfileCommandHandler : BaseCommandHandler
 
     private async Task HandleEditProfile(CallbackQuery callbackQuery, CancellationToken cancellationToken)
     {
-        await _botService.SendMessageAsync(
-            callbackQuery.Message.Chat.Id,
-            "✏️ <b>Редактирование профиля</b>\n\n" +
+        await _botService.SendMessageAsync(callbackQuery.Message.Chat.Id, "✏️ <b>Редактирование профиля</b>\n\n" +
             "В настоящее время редактирование профиля доступно только через веб-интерфейс.\n\n" +
-            "🌐 <a href=\"http://localhost:8080/swagger\">Перейти в веб-интерфейс</a>",
-            cancellationToken);
+            "🌐 <a href=\"http://localhost:8080/swagger\">Перейти в веб-интерфейс</a>", cancellationToken: cancellationToken);
     }
 
     private async Task HandleShowStats(CallbackQuery callbackQuery, CancellationToken cancellationToken)
     {
-        await _botService.SendMessageAsync(
-            callbackQuery.Message.Chat.Id,
-            "📊 Загружаем статистику...",
-            cancellationToken);
+        await _botService.SendMessageAsync(callbackQuery.Message.Chat.Id, "📊 Загружаем статистику...", cancellationToken: cancellationToken);
 
         // Имитируем отправку команды stats
         var message = new Message
@@ -232,10 +212,7 @@ public class ProfileCommandHandler : BaseCommandHandler
 
     private async Task HandleShowUsers(CallbackQuery callbackQuery, CancellationToken cancellationToken)
     {
-        await _botService.SendMessageAsync(
-            callbackQuery.Message.Chat.Id,
-            "👥 Загружаем список пользователей...",
-            cancellationToken);
+        await _botService.SendMessageAsync(callbackQuery.Message.Chat.Id, "👥 Загружаем список пользователей...", cancellationToken: cancellationToken);
 
         // Имитируем отправку команды users
         var message = new Message

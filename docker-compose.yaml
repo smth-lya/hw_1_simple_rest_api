@@ -44,7 +44,7 @@
   redis:
     image: redis:8.2.2-alpine
     container_name: hw1-redis
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --loglevel warning
+    command: redis-server --appendonly yes --loglevel warning
     volumes:
       - redis_data:/data
     networks:
@@ -78,6 +78,7 @@
 
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   backend:

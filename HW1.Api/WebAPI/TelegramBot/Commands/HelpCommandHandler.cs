@@ -46,7 +46,7 @@ public class HelpCommandHandler : BaseCommandHandler
 
         helpMessage += "\n💡 <i>Используйте /help [команда] для получения подробной информации</i>";
 
-        await _botService.SendMessageAsync(chatId, helpMessage, cancellationToken);
+        await _botService.SendMessageAsync(chatId, helpMessage, cancellationToken: cancellationToken);
     }
 
     private async Task ShowCommandHelpAsync(long chatId, string command, CancellationToken cancellationToken)
@@ -56,50 +56,47 @@ public class HelpCommandHandler : BaseCommandHandler
 
         if (handler == null)
         {
-            await _botService.SendMessageAsync(
-                chatId,
-                $"Команда <code>{command}</code> не найдена.\nИспользуйте /help для списка команд.",
-                cancellationToken);
+            await _botService.SendMessageAsync(chatId, $"Команда <code>{command}</code> не найдена.\nИспользуйте /help для списка команд.", cancellationToken: cancellationToken);
             return;
         }
 
         var commandHelp = GetCommandSpecificHelp(handler.Command);
-        await _botService.SendMessageAsync(chatId, commandHelp, cancellationToken);
+        await _botService.SendMessageAsync(chatId, commandHelp, cancellationToken: cancellationToken);
     }
 
     private static string GetCommandSpecificHelp(string command) => command.ToLower() switch
     {
-        "/start" => @"
-<b>Команда /start</b>
+        "/start" => """
+                    <b>Команда /start</b>
 
-Запускает бота и регистрирует пользователя в системе.
+                    Запускает бота и регистрирует пользователя в системе.
 
-<b>Использование:</b>
-<code>/start</code>
+                    <b>Использование:</b>
+                    <code>/start</code>
 
-После выполнения команды вы получите приветственное сообщение и доступ ко всем функциям бота.
-        ",
-        "/stats" => @"
-<b>Команда /stats</b>
+                    После выполнения команды вы получите приветственное сообщение и доступ ко всем функциям бота.
+                            ",
+                            "/stats" => @"
+                    <b>Команда /stats</b>
 
-Показывает статистику системы:
-- Общее количество пользователей
-- Активные пользователи
-- Статистика по полу
-- Даты регистрации
+                    Показывает статистику системы:
+                    - Общее количество пользователей
+                    - Активные пользователи
+                    - Статистика по полу
+                    - Даты регистрации
 
-<b>Использование:</b>
-<code>/stats</code>
-        ",
-        "/users" => @"
-<b>Команда /users</b>
+                    <b>Использование:</b>
+                    <code>/stats</code>
+                            ",
+                            "/users" => @"
+                    <b>Команда /users</b>
 
-Показывает список пользователей системы с возможностью постраничного просмотра.
+                    Показывает список пользователей системы с возможностью постраничного просмотра.
 
-<b>Использование:</b>
-<code>/users</code> - первая страница
-<code>/users 2</code> - вторая страница
-",
+                    <b>Использование:</b>
+                    <code>/users</code> - первая страница
+                    <code>/users 2</code> - вторая страница
+                    """,
         _ => $"Помощь по команде {command}\n\nОписание: {GetHandlerDescription(command)}"
     };
 

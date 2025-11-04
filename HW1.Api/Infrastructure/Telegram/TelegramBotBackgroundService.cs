@@ -2,6 +2,7 @@ using HW1.Api.Domain.Contracts.Telegram;
 
 namespace HW1.Api.Infrastructure.Telegram;
 
+// Фоновый сервис для бота
 public class TelegramBotBackgroundService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
@@ -15,43 +16,26 @@ public class TelegramBotBackgroundService : BackgroundService
         _logger = logger;
     }
 
+    // Фоновый сервис при запуске производит запуск бота
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Telegram Bot Background Service is starting");
 
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            try
-            {
-                using var scope = _serviceProvider.CreateScope();
-                var botService = scope.ServiceProvider.GetRequiredService<ITelegramBotService>();
+            using var scope = _serviceProvider.CreateScope();
+            var botService = scope.ServiceProvider.GetRequiredService<ITelegramBotService>();
                 
-                await botService.StartAsync(stoppingToken);
-                
-                await Task.Delay(Timeout.Infinite, stoppingToken);
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogInformation("Telegram Bot Background Service is stopping");
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in Telegram Bot Background Service");
-                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
-            }
+            await botService.RunAsync(stoppingToken);
         }
-    }
-
-    public override async Task StopAsync(CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Telegram Bot Background Service is stopping");
-
-        using var scope = _serviceProvider.CreateScope();
-        var botService = scope.ServiceProvider.GetRequiredService<ITelegramBotService>();
-        
-        await botService.StopAsync(cancellationToken);
-        
-        await base.StopAsync(cancellationToken);
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Telegram Bot Background Service is stopping");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in Telegram Bot Background Service");
+            throw;
+        }
     }
 }

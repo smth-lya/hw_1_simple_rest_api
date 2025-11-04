@@ -6,6 +6,7 @@ using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace HW1.Api.Infrastructure.Telegram;
 
@@ -33,62 +34,24 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
         _botClient = new TelegramBotClient(_config.BotToken);
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public async Task RunAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting Telegram Bot...");
-
-        if (_config.UseWebhook)
-        {
-            await SetWebhookAsync(cancellationToken);
-        }
-        else
-        {
-            await StartPollingAsync(cancellationToken);
-        }
-
-        _logger.LogInformation("Telegram Bot started successfully");
-    }
-
-    public async Task StopAsync(CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Stopping Telegram Bot...");
         
-        await _cancellationTokenSource.CancelAsync();
-        
-        if (_config.UseWebhook)
-        {
-            await _botClient.DeleteWebhook(cancellationToken: cancellationToken);
-        }
-
-        _logger.LogInformation("Telegram Bot stopped");
+        await StartPollingAsync(cancellationToken);
     }
-
-    public async Task SendMessageAsync(long chatId, string message, CancellationToken cancellationToken = default)
+    private async Task StartPollingAsync(CancellationToken cancellationToken)
     {
-        try
+        var receiverOptions = new ReceiverOptions
         {
-            if (message.Length > _config.MaxMessageLength)
-            {
-                message = message[.._config.MaxMessageLength] + "...";
-            }
+            AllowedUpdates = [UpdateType.Message, UpdateType.CallbackQuery],        // типы обновлений, которые бот будет слушать
+            DropPendingUpdates = true,                                              // удаление старых сообщений, которые пришли, пока бот был офлайн
+        };
 
-            await _botClient.SendMessage(
-                chatId,
-                message,
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken);
-        }
-        catch (ApiRequestException ex)
-        {
-            _logger.LogError(ex, "Error sending message to chat {ChatId}", chatId);
-        }
-    }
-
-    public async Task BroadcastMessageAsync(string message, CancellationToken cancellationToken = default)
-    {
-        // массовая рассылка
-        _logger.LogInformation("Broadcast message: {Message}", message);
-        await Task.CompletedTask;
+        await _botClient.ReceiveAsync(
+            this,           // объект, который умеет обрабатывать обновления
+            receiverOptions,            
+            cancellationToken);         // для остановки бота
     }
 
     public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
@@ -107,21 +70,6 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
             _logger.LogError(ex, "Error handling update {UpdateId}", update.Id);
         }
     }
-
-    public async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
-    {
-        var errorMessage = exception switch
-        {
-            ApiRequestException apiRequestException => 
-                $"Telegram API Error: [{apiRequestException.ErrorCode}] {apiRequestException.Message}",
-            _ => exception.ToString()
-        };
-
-        _logger.LogError(exception, "Polling error occurred");
-
-        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
-    }
-
     private async Task OnMessageReceived(Message message)
     {
         if (message.Text is not { } messageText)
@@ -131,12 +79,10 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
 
         using var scope = _serviceProvider.CreateScope();
     
-        // Проверяем, находится ли пользователь в процессе регистрации
+        // проверяем, находится ли пользователь в процессе регистрации
         var registerHandler = scope.ServiceProvider.GetRequiredService<RegisterCommandHandler>();
     
-        // Если пользователь в процессе регистрации, обрабатываем шаг
-        if (await registerHandler.IsUserInRegistrationAsync(message.From.Id) && 
-            !messageText.StartsWith("/"))
+        if (await registerHandler.IsUserInRegistrationAsync(message.From!.Id) && !messageText.StartsWith($"/"))
         {
             await registerHandler.HandleRegistrationStepAsync(message, _cancellationTokenSource.Token);
             return;
@@ -155,7 +101,6 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
             await HandleUnknownCommand(message);
         }
     }
-
     private async Task OnCallbackQueryReceived(CallbackQuery callbackQuery)
     {
         _logger.LogInformation("Received callback from {UserId}: {Data}", 
@@ -167,61 +112,73 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
         var commandHandler = commandHandlers.FirstOrDefault(handler => 
             callbackQuery.Data?.StartsWith(handler.Command) == true);
 
+        await AnswerCallbackQuery(callbackQuery.Id);
+
         if (commandHandler != null)
         {
             await commandHandler.HandleCallbackAsync(callbackQuery, _cancellationTokenSource.Token);
         }
     }
-
     private async Task HandleUnknownCommand(Message message)
     {
-        var response = @"
-        Неизвестная команда.
-        Для просмотра доступных команд используйте /help
-        ".Trim();
+        const string response = """
+                                Неизвестная команда.
+                                Для просмотра доступных команд используйте /help
+                                """;
 
         await SendMessageAsync(message.Chat.Id, response);
     }
-
-    private async Task SetWebhookAsync(CancellationToken cancellationToken)
+    
+    public async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
     {
-        if (!_config.UseWebhook || string.IsNullOrEmpty(_config.WebhookUrl))
+        var errorMessage = exception switch
         {
-            _logger.LogWarning("Webhook is not configured");
-            return;
-        }
+            ApiRequestException apiRequestException => 
+                $"Telegram API Error: [{apiRequestException.ErrorCode}] {apiRequestException.Message}",
+            _ => exception.ToString()
+        };
 
+        _logger.LogError(exception, "Polling error occurred");
+
+        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+    }
+    
+    public async Task SendMessageAsync(long chatId, string message, ReplyMarkup? replyMarkup = null, CancellationToken cancellationToken = default)
+    {
         try
         {
-            await _botClient.SetWebhook(
-                url: _config.WebhookUrl,
-                allowedUpdates: Array.Empty<UpdateType>(),
-                cancellationToken: cancellationToken);
+            if (message.Length > _config.MaxMessageLength)
+            {
+                message = message[.._config.MaxMessageLength] + "...";
+            }
 
-            _logger.LogInformation("Webhook set to: {WebhookUrl}", _config.WebhookUrl);
-            
-            var webhookInfo = await _botClient.GetWebhookInfo(cancellationToken);
-            _logger.LogInformation("Webhook info: {Url}, Pending updates: {PendingUpdatesCount}", 
-                webhookInfo.Url, webhookInfo.PendingUpdateCount);
+            await _botClient.SendMessage(
+                chatId,
+                message,
+                parseMode: ParseMode.Html,
+                replyMarkup: replyMarkup,
+                cancellationToken: cancellationToken);
         }
-        catch (Exception ex)
+        catch (ApiRequestException ex)
         {
-            _logger.LogError(ex, "Failed to set webhook");
-            throw;
+            _logger.LogError(ex, "Error sending message to chat {ChatId}", chatId);
         }
     }
 
-    private async Task StartPollingAsync(CancellationToken cancellationToken)
+    public async Task AnswerCallbackQuery(
+        string callbackQueryId,
+        string? text = null,
+        bool showAlert = false,
+        string? url = null,
+        int? cacheTime = null,
+        CancellationToken cancellationToken = default)
     {
-        var receiverOptions = new ReceiverOptions
-        {
-            AllowedUpdates = [],
-            DropPendingUpdates = true,
-        };
+        await _botClient.AnswerCallbackQuery(callbackQueryId, text, showAlert, url, cacheTime, cancellationToken);
+    }
 
-        await _botClient.ReceiveAsync(
-            this,
-            receiverOptions,
-            cancellationToken);
+    public async Task BroadcastMessageAsync(string message, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Broadcast message: {Message}", message);
+        await Task.CompletedTask;
     }
 }

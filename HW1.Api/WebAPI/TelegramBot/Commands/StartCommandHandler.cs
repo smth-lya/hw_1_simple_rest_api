@@ -7,18 +7,24 @@ namespace HW1.Api.WebAPI.TelegramBot.Commands;
 
 public class StartCommandHandler : BaseCommandHandler
 {
+    private readonly ILogger<StartCommandHandler> _logger;
+    
     public override string Command => "/start";
     public override string Description => "Запуск бота и регистрация";
 
     public StartCommandHandler(
         ITelegramBotService botService,
         IUserService userService,
-        ITelegramUserService telegramUserService)
-        : base(botService, userService, telegramUserService) { }
+        ITelegramUserService telegramUserService,
+        ILogger<StartCommandHandler> logger)
+        : base(botService, userService, telegramUserService)
+    {
+        _logger = logger;
+    }
 
     public override async Task HandleAsync(Message message, CancellationToken cancellationToken)
     {
-        var telegramUser = await _telegramUserService.RegisterUserAsync(
+        await _telegramUserService.RegisterUserAsync(
             message.From.Id,
             message.Chat.Id,
             message.From.Username ?? string.Empty,
@@ -26,34 +32,52 @@ public class StartCommandHandler : BaseCommandHandler
             message.From.LastName ?? string.Empty
         );
 
-        var welcomeMessage = @$"
-👋 Добро пожаловать, {message.From.FirstName}!
+        var welcomeMessage = $"""
 
-Я - бот для управления пользователями системы.
+                              👋 Добро пожаловать, {message.From.FirstName}!
 
-📋 Доступные команды:
-/start - Запуск бота
-/help - Помощь и список команд
-/profile - Мой профиль
-/users - Список пользователей
-/stats - Статистика системы
-/register - Регистрация в системе
+                              Я - бот для управления пользователями системы.
 
-Для получения помощи по конкретной команде используйте /help [команда]
-".Trim();
+                              📋 Доступные команды:
+                              /start - Запуск бота
+                              /help - Помощь и список команд
+                              /profile - Мой профиль
+                              /users - Список пользователей
+                              /stats - Статистика системы
+                              /register - Регистрация в системе
 
-        var keyboard = new ReplyKeyboardMarkup(new[]
+                              Для получения помощи по конкретной команде используйте /help [команда]
+
+                              """.Trim();
+
+        var keyboard = new InlineKeyboardMarkup(new[]
         {
-            new[] { new KeyboardButton("Статистика"), new KeyboardButton("Пользователи") },
-            new[] { new KeyboardButton("Мой профиль"), new KeyboardButton("ℹПомощь") }
-        })
-        {
-            ResizeKeyboard = true
-        };
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("📊 Статистика", "/stats"),
+                InlineKeyboardButton.WithCallbackData("👥 Пользователи", "/users")
+            },
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("👤 Мой профиль", "/profile"),
+                InlineKeyboardButton.WithCallbackData("ℹ Помощь", "/help")
+            }
+        });
 
-        await _botService.SendMessageAsync(
-            message.Chat.Id,
-            welcomeMessage,
-            cancellationToken);
+        await _botService.SendMessageAsync(message.Chat.Id, welcomeMessage, keyboard, cancellationToken: cancellationToken);
+    }
+    
+    public override async Task HandleCallbackAsync(CallbackQuery callbackQuery, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Received callback from {UserId}: {Data}", 
+            callbackQuery.From.Id, callbackQuery.Data);
+
+        if (callbackQuery.Data == null)
+        {
+            return;
+        }
+        var chatId = callbackQuery.Message?.Chat.Id ?? callbackQuery.From.Id;
+
+        await _botService.SendMessageAsync(chatId, callbackQuery.Data, cancellationToken: cancellationToken);
     }
 }
