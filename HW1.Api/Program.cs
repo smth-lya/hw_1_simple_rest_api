@@ -8,8 +8,14 @@ using HW1.Api.Infrastructure.Telegram;
 using HW1.Api.WebAPI.Extensions;
 using HW1.Api.WebAPI.TelegramBot.Commands;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, config) =>
+{
+    config.ReadFrom.Configuration(context.Configuration);
+});
 
 builder.Services.AddControllers();
 builder.Services.AddFluentValidationAutoValidation();

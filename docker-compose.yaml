@@ -17,6 +17,8 @@
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - ./logs:/app/Logs
     networks:
       - backend
     restart: unless-stopped
