@@ -26,16 +26,15 @@ builder.Services
     .AddApplication(builder.Configuration)
     .AddInfrastructure(builder.Configuration);
 
-builder.Services.AddScoped<ITelegramUserService, TelegramUserService>();
 
-builder.Services.AddScoped<ICommandHandler, StartCommandHandler>();
-builder.Services.AddScoped<ICommandHandler, HelpCommandHandler>();
-builder.Services.AddScoped<ICommandHandler, StatsCommandHandler>();
-builder.Services.AddScoped<ICommandHandler, UsersCommandHandler>();
-builder.Services.AddScoped<ICommandHandler, RegisterCommandHandler>();
-builder.Services.AddScoped<ICommandHandler, ProfileCommandHandler>();
-
-builder.Services.AddScoped<RegisterCommandHandler, RegisterCommandHandler>();
+builder.Services.Scan(scan => scan
+    .FromAssemblyOf<ICommandHandler>()
+    .AddClasses(classes => classes
+        .AssignableTo<ICommandHandler>()
+        .Where(type => !type.IsAbstract)
+    )
+    .AsSelfWithInterfaces() 
+    .WithScopedLifetime());
 
 builder.Services.AddTransient<Func<IEnumerable<ICommandHandler>>>(serviceProvider => 
 {
@@ -50,6 +49,7 @@ builder.Services.AddTransient<Func<IEnumerable<ICommandHandler>>>(serviceProvide
     ];
 });
 
+builder.Services.AddScoped<ITelegramUserService, TelegramUserService>();
 builder.Services.AddScoped<ITelegramBotService, TelegramBotService>();
 builder.Services.AddHostedService<TelegramBotBackgroundService>();
 

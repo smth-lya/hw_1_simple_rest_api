@@ -23,11 +23,16 @@ public class HelpCommandHandler : BaseCommandHandler
 
     public override async Task HandleAsync(Message message, CancellationToken cancellationToken)
     {
-        var commandText = message.Text?.Split(' ').LastOrDefault()?.ToLower();
+        var parts = message.Text?.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts == null || parts.Length == 0)
+            return;
 
-        if (!string.IsNullOrEmpty(commandText) && commandText != "/help")
+        var command = parts[0].ToLower();
+        var argument = parts.Length > 1 ? parts[1].ToLower() : null;
+
+        if (command == "/help" && !string.IsNullOrEmpty(argument))
         {
-            await ShowCommandHelpAsync(message.Chat.Id, commandText, cancellationToken);
+            await ShowCommandHelpAsync(message.Chat.Id, argument, cancellationToken);
         }
         else
         {
