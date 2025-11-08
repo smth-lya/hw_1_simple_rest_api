@@ -138,7 +138,7 @@ public class TelegramBotService : ITelegramBotService, IUpdateHandler
             _ => exception.ToString()
         };
 
-        _logger.LogError(exception, "Polling error occurred");
+        _logger.LogError(exception, errorMessage);
 
         await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
     }

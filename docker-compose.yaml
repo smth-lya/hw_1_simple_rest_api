@@ -11,7 +11,10 @@
       ConnectionStrings__PostgresConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};"
       ConnectionStrings__RedisConnection: redis:6379
       TelegramBot__BotToken: ${TELEGRAM_BOT_TOKEN}
-      TelegramBot__UseWebhook: "false"
+      OpenSearch__Url: "http://opensearch-node1:9200"
+    #  OpenSearch__User: "admin"
+    #  OpenSearch__Password: "${OPENSEARCH_INITIAL_ADMIN_PASSWORD}"
+      OpenSearch__DisableSslVerification: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -21,6 +24,7 @@
       - ./logs:/app/Logs
     networks:
       - backend
+      - opensearch-net
     restart: unless-stopped
 
   postgres:
@@ -77,11 +81,95 @@
       timeout: 10s
       retries: 3
     restart: unless-stopped
-
+    
+  opensearch-node1:
+    image: opensearchproject/opensearch:3
+    container_name: opensearch-node-1
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node1 # имя ноды, которая запускается в этом контейнере
+      - discovery.seed_hosts=opensearch-node1,opensearch-node2 # список узлов, к которым будет пытаться подключится текущий узел для образования кластера
+      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2 # ноды, на основе которых будет выбираться мастер нода в созданном кластере
+      - bootstrap.memory_lock=true # запрещает ОС выгружать память JVM процесса на swap память на диске
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" # определение минимального и максимального размера кучиJVM
+  #   - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD}
+      - "DISABLE_INSTALL_DEMO_CONFIG=true"
+      - "DISABLE_SECURITY_PLUGIN=true" 
+    ulimits: # ограничения ОС, которые может использовать процесс 
+      memlock:
+        soft: -1 # разрешает неограниченную блокировку памяти. Мягкое разрешение, которое можно временно привысить. (нужно при включенном bootstrap.memory_lock=true)
+        hard: -1 # максимальный лимит тоже не ограничен
+      nofile:
+        soft: 65536 # один процесс может открыть до 65536 файлов одновременно
+        hard: 65536
+    volumes:
+      - opensearch-data1:/usr/share/opensearch/data
+    ports:
+      - "9200:9200" # REST API
+      - "9600:9600" # Анализатор производительности
+    networks:
+      - opensearch-net
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -s -f http://localhost:9200/_cluster/health > /dev/null || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    
+  opensearch-node2:
+    image: opensearchproject/opensearch:3
+    container_name: opensearch-node-2
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node2
+      - discovery.seed_hosts=opensearch-node1,opensearch-node2 
+      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2 
+      - bootstrap.memory_lock=true 
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" 
+  #   - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD}
+      - "DISABLE_INSTALL_DEMO_CONFIG=true"
+      - "DISABLE_SECURITY_PLUGIN=true"
+    ulimits:  
+      memlock:
+        soft: -1 
+        hard: -1 
+      nofile:
+        soft: 65536 
+        hard: 65536
+    volumes:
+      - opensearch-data2:/usr/share/opensearch/data
+    networks:
+      - opensearch-net  
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -s -f http://localhost:9200/_cluster/health > /dev/null || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:3
+    container_name: opensearch-dashboards
+    ports:
+      - 5601:5601
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch-node1:9200","http://opensearch-node2:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: true
+    networks:
+      - opensearch-net
+    depends_on:
+      opensearch-node1:
+        condition: service_healthy
+      opensearch-node2:
+        condition: service_healthy
+    
 volumes:
   postgres_data:
   redis_data:
+  opensearch-data1:
+  opensearch-data2:
 
 networks:
   backend:
     driver: bridge
+  opensearch-net:
