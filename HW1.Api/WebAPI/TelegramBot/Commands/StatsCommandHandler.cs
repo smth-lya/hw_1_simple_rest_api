@@ -1,6 +1,7 @@
 using HW1.Api.Domain.Contracts.Services;
 using HW1.Api.Domain.Contracts.Telegram;
 using HW1.Api.Domain.Models;
+using Microsoft.Extensions.Logging;
 using Telegram.Bot.Types;
 
 namespace HW1.Api.WebAPI.TelegramBot.Commands;
@@ -16,30 +17,48 @@ public class StatsCommandHandler : BaseCommandHandler
         ITelegramBotService botService,
         IUserService userService,
         ITelegramUserService telegramUserService,
-        IUserAnalyticsService analyticsService)
-        : base(botService, userService, telegramUserService)
+        IUserAnalyticsService analyticsService,
+        ILogger<StatsCommandHandler> logger)
+        : base(botService, userService, telegramUserService, logger)
     {
         _analyticsService = analyticsService;
     }
 
     public override async Task HandleAsync(Message message, CancellationToken cancellationToken)
     {
-        if (!await ValidateUserAccessAsync(message.From.Id, cancellationToken))
-        {
-            await _botService.SendMessageAsync(
-                message.Chat.Id, 
-                "Доступ запрещен. Сначала выполните /start",
-                cancellationToken: cancellationToken);
-            return;
-        }
+        using var activity = BeginCommandScope(message);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
+            _logger.LogInformation("Processing stats command from user {UserId}", message.From?.Id);
+
+            if (!await ValidateUserAccessAsync(message.From.Id, cancellationToken))
+            {
+                _logger.LogWarning("User {UserId} access denied for stats command", message.From?.Id);
+                await _botService.SendMessageAsync(
+                    message.Chat.Id, 
+                    "Доступ запрещен. Сначала выполните /start",
+                    cancellationToken: cancellationToken);
+                return;
+            }
+
             var stats = await GetSystemStatsAsync();
             await _botService.SendMessageAsync(message.Chat.Id, stats, cancellationToken: cancellationToken);
+
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Stats command completed successfully in {ElapsedMs}ms for user {UserId}", 
+                stopwatch.ElapsedMilliseconds, message.From?.Id);
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
+            _logger.LogError(
+                ex, 
+                "Error processing stats command after {ElapsedMs}ms for user {UserId}", 
+                stopwatch.ElapsedMilliseconds, message.From?.Id);
+                
             await _botService.SendMessageAsync(
                 message.Chat.Id, 
                 "Ошибка при получении статистики", 
@@ -49,11 +68,17 @@ public class StatsCommandHandler : BaseCommandHandler
 
     private async Task<string> GetSystemStatsAsync()
     {
+        _logger.LogDebug("Fetching system statistics");
+
         var totalUsers = await _userService.GetTotalUsersCountAsync();
         var genderStats = await _analyticsService.GetUsersCountByGenderAsync();
         var earliestDate = await _analyticsService.GetEarliestRegistrationDateAsync();
         var latestDate = await _analyticsService.GetLatestRegistrationDateAsync();
         var telegramUsersCount = await _telegramUserService.GetActiveUsersCountAsync();
+
+        _logger.LogDebug(
+            "Statistics fetched: TotalUsers={TotalUsers}, TelegramUsers={TelegramUsers}, GenderStats={GenderStats}", 
+            totalUsers, telegramUsersCount, string.Join(",", genderStats.Select(g => $"{g.Key}:{g.Value}")));
 
         var statsMessage = 
             $"""

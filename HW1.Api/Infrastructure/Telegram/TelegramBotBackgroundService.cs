@@ -19,6 +19,12 @@ public class TelegramBotBackgroundService : BackgroundService
     // Фоновый сервис при запуске производит запуск бота
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        using var activity = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["Service"] = "TelegramBotBackgroundService",
+            ["Operation"] = "ExecuteAsync"
+        });
+        
         _logger.LogInformation("Telegram Bot Background Service is starting");
 
         try

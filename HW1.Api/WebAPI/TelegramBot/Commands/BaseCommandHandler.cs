@@ -9,15 +9,18 @@ public abstract class BaseCommandHandler : ICommandHandler
     protected readonly ITelegramBotService _botService;
     protected readonly IUserService _userService;
     protected readonly ITelegramUserService _telegramUserService;
+    protected readonly ILogger _logger;
 
     protected BaseCommandHandler(
         ITelegramBotService botService,
         IUserService userService,
-        ITelegramUserService telegramUserService)
+        ITelegramUserService telegramUserService,
+        ILogger logger)
     {
         _botService = botService;
         _userService = userService;
         _telegramUserService = telegramUserService;
+        _logger = logger;
     }
 
     public abstract string Command { get; }
@@ -32,7 +35,44 @@ public abstract class BaseCommandHandler : ICommandHandler
 
     protected async Task<bool> ValidateUserAccessAsync(long telegramUserId, CancellationToken cancellationToken)
     {
+        using var activity = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["Operation"] = "ValidateUserAccess",
+            ["TelegramUserId"] = telegramUserId
+        });
+
         var user = await _telegramUserService.GetUserAsync(telegramUserId);
-        return user is { IsActive: true };
+        var isValid = user is { IsActive: true };
+
+        _logger.LogDebug("User access validation result: {IsValid} for user {TelegramUserId}", 
+            isValid, telegramUserId);
+
+        return isValid;
+    }
+
+    protected IDisposable BeginCommandScope(Message message, string operation = "HandleCommand")
+    {
+        return _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["Command"] = Command,
+            ["Operation"] = operation,
+            ["MessageId"] = message.MessageId,
+            ["UserId"] = message.From?.Id,
+            ["ChatId"] = message.Chat.Id,
+            ["UserName"] = message.From?.Username ?? "Unknown"
+        });
+    }
+
+    protected IDisposable BeginCallbackScope(CallbackQuery callbackQuery, string operation = "HandleCallback")
+    {
+        return _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["Command"] = Command,
+            ["Operation"] = operation,
+            ["CallbackQueryId"] = callbackQuery.Id,
+            ["UserId"] = callbackQuery.From.Id,
+            ["ChatId"] = callbackQuery.Message?.Chat.Id,
+            ["CallbackData"] = callbackQuery.Data
+        });
     }
 }

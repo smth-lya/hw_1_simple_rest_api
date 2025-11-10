@@ -15,38 +15,62 @@ public class HelpCommandHandler : BaseCommandHandler
         ITelegramBotService botService,
         IUserService userService,
         ITelegramUserService telegramUserService,
-        Func<IEnumerable<ICommandHandler>> commandHandlersFactory) 
-        : base(botService, userService, telegramUserService)
+        Func<IEnumerable<ICommandHandler>> commandHandlersFactory,
+        ILogger<HelpCommandHandler> logger) 
+        : base(botService, userService, telegramUserService, logger)
     {
         _commandHandlersFactory = commandHandlersFactory;
     }
 
     public override async Task HandleAsync(Message message, CancellationToken cancellationToken)
     {
-        var parts = message.Text?.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts == null || parts.Length == 0)
-            return;
+        using var activity = BeginCommandScope(message);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        var command = parts[0].ToLower();
-        var argument = parts.Length > 1 ? parts[1].ToLower() : null;
-
-        if (command == "/help" && !string.IsNullOrEmpty(argument))
+        try
         {
-            await ShowCommandHelpAsync(message.Chat.Id, argument, cancellationToken);
+            _logger.LogInformation("Processing help command from user {UserId}", message.From?.Id);
+
+            var parts = message.Text?.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts == null || parts.Length == 0)
+                return;
+
+            var command = parts[0].ToLower();
+            var argument = parts.Length > 1 ? parts[1].ToLower() : null;
+
+            if (command == "/help" && !string.IsNullOrEmpty(argument))
+            {
+                _logger.LogDebug("Showing specific help for command: {CommandArgument}", argument);
+                await ShowCommandHelpAsync(message.Chat.Id, argument, cancellationToken);
+            }
+            else
+            {
+                _logger.LogDebug("Showing general help with all commands");
+                await ShowGeneralHelpAsync(message.Chat.Id, cancellationToken);
+            }
+
+            stopwatch.Stop();
+            _logger.LogInformation("Help command completed in {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
         }
-        else
+        catch (Exception ex)
         {
-            await ShowGeneralHelpAsync(message.Chat.Id, cancellationToken);
+            stopwatch.Stop();
+            _logger.LogError(ex, "Error processing help command after {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            throw;
         }
     }
 
     private async Task ShowGeneralHelpAsync(long chatId, CancellationToken cancellationToken)
     {
+        var handlers = _commandHandlersFactory().OrderBy(h => h.Command).ToList();
+        
+        _logger.LogInformation("Showing general help with {CommandCount} commands", handlers.Count);
+
         var helpMessage = "📋 <b>Доступные команды:</b>\n\n";
         
-        foreach (var handler in _commandHandlersFactory().OrderBy(h => h.Command)!)
+        foreach (var handler in handlers)
         {
-            helpMessage += $"<code>{handler.Command}</code> - {handler.Description}\n";
+            helpMessage += $"{handler.Command} - {handler.Description}\n";
         }
 
         helpMessage += "\n💡 <i>Используйте /help [команда] для получения подробной информации</i>";
@@ -61,10 +85,16 @@ public class HelpCommandHandler : BaseCommandHandler
 
         if (handler == null)
         {
-            await _botService.SendMessageAsync(chatId, $"Команда <code>{command}</code> не найдена.\nИспользуйте /help для списка команд.", cancellationToken: cancellationToken);
+            _logger.LogWarning("Requested help for unknown command: {UnknownCommand}", command);
+            await _botService.SendMessageAsync(
+                chatId, 
+                $"Команда {command} не найдена.\nИспользуйте /help для списка команд.", 
+                cancellationToken: cancellationToken);
             return;
         }
 
+        _logger.LogDebug("Showing specific help for command: {CommandName}", handler.Command);
+        
         var commandHelp = GetCommandSpecificHelp(handler.Command);
         await _botService.SendMessageAsync(chatId, commandHelp, cancellationToken: cancellationToken);
     }
@@ -77,11 +107,11 @@ public class HelpCommandHandler : BaseCommandHandler
                     Запускает бота и регистрирует пользователя в системе.
 
                     <b>Использование:</b>
-                    <code>/start</code>
+                    /start
 
                     После выполнения команды вы получите приветственное сообщение и доступ ко всем функциям бота.
-                            ",
-                            "/stats" => @"
+                    """,
+        "/stats" => """
                     <b>Команда /stats</b>
 
                     Показывает статистику системы:
@@ -91,16 +121,16 @@ public class HelpCommandHandler : BaseCommandHandler
                     - Даты регистрации
 
                     <b>Использование:</b>
-                    <code>/stats</code>
-                            ",
-                            "/users" => @"
+                    /stats
+                    """,
+        "/users" => """
                     <b>Команда /users</b>
 
                     Показывает список пользователей системы с возможностью постраничного просмотра.
 
                     <b>Использование:</b>
-                    <code>/users</code> - первая страница
-                    <code>/users 2</code> - вторая страница
+                    /users - первая страница
+                    /users 2 - вторая страница
                     """,
         _ => $"Помощь по команде {command}\n\nОписание: {GetHandlerDescription(command)}"
     };

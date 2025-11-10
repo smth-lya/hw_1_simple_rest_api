@@ -16,39 +16,69 @@ public class ProfileCommandHandler : BaseCommandHandler
     public ProfileCommandHandler(
         ITelegramBotService botService,
         IUserService userService,
-        ITelegramUserService telegramUserService)
-        : base(botService, userService, telegramUserService) { }
+        ITelegramUserService telegramUserService,
+        ILogger<ProfileCommandHandler> logger)
+        : base(botService, userService, telegramUserService, logger) { }
 
     public override async Task HandleAsync(Message message, CancellationToken cancellationToken)
     {
-        if (!await ValidateUserAccessAsync(message.From.Id, cancellationToken))
-        {
-            await _botService.SendMessageAsync(message.Chat.Id, "❌ Сначала выполните /start для регистрации в боте", cancellationToken: cancellationToken);
-            return;
-        }
-
-        var telegramUser = await _telegramUserService.GetUserAsync(message.From.Id);
-        if (telegramUser == null)
-        {
-            await _botService.SendMessageAsync(message.Chat.Id, "❌ Пользователь не найден. Выполните /start", cancellationToken: cancellationToken);
-            return;
-        }
+        using var activity = BeginCommandScope(message);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
+            _logger.LogInformation("Processing profile command for user {UserId}", message.From?.Id);
+
+            if (!await ValidateUserAccessAsync(message.From.Id, cancellationToken))
+            {
+                _logger.LogWarning("User {UserId} access denied for profile command", message.From?.Id);
+                await _botService.SendMessageAsync(
+                    message.Chat.Id, 
+                    "❌ Сначала выполните /start для регистрации в боте", 
+                    cancellationToken: cancellationToken);
+                return;
+            }
+
+            var telegramUser = await _telegramUserService.GetUserAsync(message.From.Id);
+            if (telegramUser == null)
+            {
+                _logger.LogWarning("Telegram user {UserId} not found", message.From?.Id);
+                await _botService.SendMessageAsync(
+                    message.Chat.Id, 
+                    "❌ Пользователь не найден. Выполните /start", 
+                    cancellationToken: cancellationToken);
+                return;
+            }
+
             var profileMessage = await BuildProfileMessageAsync(telegramUser, message.From);
             var keyboard = CreateProfileKeyboard(telegramUser);
 
             await _botService.SendMessageAsync(message.Chat.Id, profileMessage, keyboard, cancellationToken);
+
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Profile command completed successfully in {ElapsedMs}ms for user {UserId}", 
+                stopwatch.ElapsedMilliseconds, message.From?.Id);
         }
         catch (Exception ex)
         {
-            await _botService.SendMessageAsync(message.Chat.Id, "❌ Ошибка при загрузке профиля", cancellationToken: cancellationToken);
+            stopwatch.Stop();
+            _logger.LogError(
+                ex, 
+                "Error processing profile command after {ElapsedMs}ms for user {UserId}", 
+                stopwatch.ElapsedMilliseconds, message.From?.Id);
+                
+            await _botService.SendMessageAsync(
+                message.Chat.Id, 
+                "❌ Ошибка при загрузке профиля", 
+                cancellationToken: cancellationToken);
         }
     }
 
     private async Task<string> BuildProfileMessageAsync(TelegramUser telegramUser, User telegramFrom)
     {
+        _logger.LogDebug("Building profile message for user {UserId}", telegramUser.TelegramUserId);
+        
         var profile = new StringBuilder();
 
         profile.AppendLine("👤 <b>Ваш профиль</b>");
@@ -72,18 +102,25 @@ public class ProfileCommandHandler : BaseCommandHandler
             var systemUser = await _userService.GetUserByIdAsync(telegramUser.SystemUserId.Value);
             if (systemUser != null)
             {
+                _logger.LogDebug("Including system user data for user {UserId}", telegramUser.TelegramUserId);
+                
                 profile.AppendLine("<b>Данные системы:</b>");
                 profile.AppendLine($"   System ID: <code>{systemUser.Id}</code>");
                 profile.AppendLine($"   Username: <code>{systemUser.Username}</code>");
                 profile.AppendLine($"   Регистрация: {systemUser.CreatedAt:dd.MM.yyyy}");
                 profile.AppendLine($"   Обновлен: {systemUser.UpdatedAt:dd.MM.yyyy}");
                 
-                // if (systemUser.Roles.Any())
-                //     profile.AppendLine($"   🎯 Роли: {string.Join(", ", systemUser.Roles)}");
+                if (systemUser.Roles.Count != 0)
+                    profile.AppendLine($"   🎯 Роли: {string.Join(", ", systemUser.Roles)}");
+                    
+                profile.AppendLine();
+                profile.AppendLine("⚠️ <i>Вы можете отвязать аккаунт, если больше не хотите использовать систему</i>");
             }
         }
         else
         {
+            _logger.LogDebug("User {UserId} has no system profile", telegramUser.TelegramUserId);
+            
             profile.AppendLine("❌ <b>Системный профиль:</b> Не зарегистрирован");
             profile.AppendLine("💡 Используйте /register для создания учетной записи в системе");
         }
@@ -107,18 +144,25 @@ public class ProfileCommandHandler : BaseCommandHandler
 
         if (!telegramUser.SystemUserId.HasValue)
         {
+            // Пользователь без системного аккаунта
             buttons.Add([
                 InlineKeyboardButton.WithCallbackData("🚀 Зарегистрироваться в системе", $"{Command} register_from_profile")
             ]);
         }
         else
         {
+            // Пользователь с привязанным системным аккаунтом
             buttons.Add([
                 InlineKeyboardButton.WithCallbackData("🔄 Обновить профиль", $"{Command} refresh_profile"),
                 InlineKeyboardButton.WithCallbackData("✏️ Редактировать", $"{Command} edit_profile")
             ]);
+            
+            buttons.Add([
+                InlineKeyboardButton.WithCallbackData("🔗 Отвязать аккаунт", $"{Command} unlink_account")
+            ]);
         }
 
+        // Общие кнопки для всех пользователей
         buttons.Add([
             InlineKeyboardButton.WithCallbackData("📊 Статистика", $"{Command} show_stats"),
             InlineKeyboardButton.WithCallbackData("👥 Пользователи", $"{Command} show_users")
@@ -129,55 +173,100 @@ public class ProfileCommandHandler : BaseCommandHandler
 
     public override async Task HandleCallbackAsync(CallbackQuery callbackQuery, CancellationToken cancellationToken)
     {
-        var data = callbackQuery.Data.Split()[1];
-        
-        switch (data)
+        using var activity = BeginCallbackScope(callbackQuery);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
         {
-            case "refresh_profile":
-                await HandleRefreshProfile(callbackQuery, cancellationToken);
-                break;
-                
-            case "register_from_profile":
-                await HandleRegisterFromProfile(callbackQuery, cancellationToken);
-                break;
-                
-            case "edit_profile":
-                await HandleEditProfile(callbackQuery, cancellationToken);
-                break;
-                
-            case "show_stats":
-                await HandleShowStats(callbackQuery, cancellationToken);
-                break;
-                
-            case "show_users":
-                await HandleShowUsers(callbackQuery, cancellationToken);
-                break;
+            var data = callbackQuery.Data?.Split()[1];
+            
+            _logger.LogInformation("Processing profile callback: {CallbackData}", data);
+
+            switch (data)
+            {
+                case "refresh_profile":
+                    await HandleRefreshProfile(callbackQuery, cancellationToken);
+                    break;
+                    
+                case "register_from_profile":
+                    await HandleRegisterFromProfile(callbackQuery, cancellationToken);
+                    break;
+                    
+                case "edit_profile":
+                    await HandleEditProfile(callbackQuery, cancellationToken);
+                    break;
+                    
+                case "unlink_account":
+                    await HandleUnlinkAccount(callbackQuery, cancellationToken);
+                    break;
+                    
+                case "show_stats":
+                    await HandleShowStats(callbackQuery, cancellationToken);
+                    break;
+                    
+                case "show_users":
+                    await HandleShowUsers(callbackQuery, cancellationToken);
+                    break;
+                    
+                case "confirm_unlink":
+                    await HandleConfirmUnlink(callbackQuery, cancellationToken);
+                    break;
+                    
+                case "cancel_unlink":
+                    await HandleCancelUnlink(callbackQuery, cancellationToken);
+                    break;
+                    
+                default:
+                    _logger.LogWarning("Unknown profile callback data: {CallbackData}", data);
+                    break;
+            }
+
+            await _botService.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: cancellationToken);
+
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Profile callback processed in {ElapsedMs}ms for user {UserId}", 
+                stopwatch.ElapsedMilliseconds, callbackQuery.From.Id);
         }
-        
-        await _botService.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: cancellationToken);
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(
+                ex, 
+                "Error processing profile callback after {ElapsedMs}ms for user {UserId}", 
+                stopwatch.ElapsedMilliseconds, callbackQuery.From.Id);
+        }
     }
 
     private async Task HandleRefreshProfile(CallbackQuery callbackQuery, CancellationToken cancellationToken)
     {
-        // Обновляем время активности
+        _logger.LogDebug("Refreshing profile for user {UserId}", callbackQuery.From.Id);
+
         await _telegramUserService.UpdateUserActivityAsync(callbackQuery.From.Id);
 
-        // Перестраиваем сообщение профиля
         var telegramUser = await _telegramUserService.GetUserAsync(callbackQuery.From.Id);
         if (telegramUser != null)
         {
             var profileMessage = await BuildProfileMessageAsync(telegramUser, callbackQuery.From);
             var keyboard = CreateProfileKeyboard(telegramUser);
 
-            await _botService.SendMessageAsync(callbackQuery.Message.Chat.Id, "✅ Профиль обновлен!\n\n" + profileMessage, keyboard, cancellationToken: cancellationToken);
+            await _botService.SendMessageAsync(
+                callbackQuery.Message.Chat.Id, 
+                "✅ Профиль обновлен!\n\n" + profileMessage, 
+                keyboard, 
+                cancellationToken: cancellationToken);
         }
     }
 
     private async Task HandleRegisterFromProfile(CallbackQuery callbackQuery, CancellationToken cancellationToken)
     {
-        await _botService.SendMessageAsync(callbackQuery.Message.Chat.Id, "🚀 Начинаем регистрацию в системе...", cancellationToken: cancellationToken);
+        _logger.LogInformation("Initiating registration from profile for user {UserId}", callbackQuery.From.Id);
 
-        // Имитируем отправку команды register
+        await _botService.SendMessageAsync(
+            callbackQuery.Message.Chat.Id, 
+            "🚀 Начинаем регистрацию в системе...", 
+            cancellationToken: cancellationToken);
+
         var message = new Message
         {
             From = callbackQuery.From,
@@ -190,16 +279,133 @@ public class ProfileCommandHandler : BaseCommandHandler
 
     private async Task HandleEditProfile(CallbackQuery callbackQuery, CancellationToken cancellationToken)
     {
-        await _botService.SendMessageAsync(callbackQuery.Message.Chat.Id, "✏️ <b>Редактирование профиля</b>\n\n" +
+        _logger.LogDebug("User {UserId} requested profile edit", callbackQuery.From.Id);
+
+        await _botService.SendMessageAsync(
+            callbackQuery.Message.Chat.Id, 
+            "✏️ <b>Редактирование профиля</b>\n\n" +
             "В настоящее время редактирование профиля доступно только через веб-интерфейс.\n\n" +
-            "🌐 <a href=\"http://localhost:8080/swagger\">Перейти в веб-интерфейс</a>", cancellationToken: cancellationToken);
+            "🌐 <a href=\"http://localhost:8080/swagger\">Перейти в веб-интерфейс</a>", 
+            cancellationToken: cancellationToken);
+    }
+
+    private async Task HandleUnlinkAccount(CallbackQuery callbackQuery, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("User {UserId} initiated account unlinking", callbackQuery.From.Id);
+
+        var confirmationMessage = """
+            ⚠️ <b>Подтверждение отвязки аккаунта</b>
+            
+            Вы уверены, что хотите отвязать ваш Telegram аккаунт от системы?
+            
+            <b>Последствия:</b>
+            • Вы потеряете доступ к системным функциям
+            • Ваши данные останутся в системе, но будут недоступны через бота
+            • Для повторного доступа потребуется новая регистрация
+            
+            Это действие можно отменить позже.
+            """;
+
+        var confirmationKeyboard = new InlineKeyboardMarkup(new[]
+        {
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("✅ Да, отвязать", $"{Command} confirm_unlink"),
+                InlineKeyboardButton.WithCallbackData("❌ Отмена", $"{Command} cancel_unlink")
+            }
+        });
+
+        await _botService.SendMessageAsync(
+            callbackQuery.Message.Chat.Id,
+            confirmationMessage,
+            confirmationKeyboard,
+            cancellationToken: cancellationToken);
+    }
+
+    private async Task HandleConfirmUnlink(CallbackQuery callbackQuery, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("User {UserId} confirmed account unlinking", callbackQuery.From.Id);
+
+        try
+        {
+            await _telegramUserService.UnlinkFromSystemUserAsync(callbackQuery.From.Id);
+            
+            _logger.LogInformation("Account successfully unlinked for user {UserId}", callbackQuery.From.Id);
+
+            var successMessage = """
+                ✅ <b>Аккаунт успешно отвязан!</b>
+                
+                Ваш Telegram аккаунт больше не связан с системой.
+                
+                Вы можете:
+                • Продолжить использовать базовые функции бота
+                • Зарегистрироваться заново командой /register
+                • Обратиться к администратору при необходимости
+                """;
+
+            await _botService.SendMessageAsync(
+                callbackQuery.Message.Chat.Id,
+                successMessage,
+                cancellationToken: cancellationToken);
+
+            // Обновляем профиль чтобы показать новые кнопки
+            var telegramUser = await _telegramUserService.GetUserAsync(callbackQuery.From.Id);
+            if (telegramUser != null)
+            {
+                var profileMessage = await BuildProfileMessageAsync(telegramUser, callbackQuery.From);
+                var keyboard = CreateProfileKeyboard(telegramUser);
+
+                await _botService.SendMessageAsync(
+                    callbackQuery.Message.Chat.Id,
+                    profileMessage,
+                    keyboard,
+                    cancellationToken: cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error unlinking account for user {UserId}", callbackQuery.From.Id);
+            
+            await _botService.SendMessageAsync(
+                callbackQuery.Message.Chat.Id,
+                "❌ <b>Ошибка при отвязке аккаунта</b>\n\nПожалуйста, попробуйте позже или обратитесь к администратору.",
+                cancellationToken: cancellationToken);
+        }
+    }
+
+    private async Task HandleCancelUnlink(CallbackQuery callbackQuery, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("User {UserId} cancelled account unlinking", callbackQuery.From.Id);
+
+        await _botService.SendMessageAsync(
+            callbackQuery.Message.Chat.Id,
+            "❌ <b>Отвязка аккаунта отменена</b>\n\nВаш аккаунт остается привязанным к системе.",
+            cancellationToken: cancellationToken);
+
+        // Показываем обновленный профиль
+        var telegramUser = await _telegramUserService.GetUserAsync(callbackQuery.From.Id);
+        if (telegramUser != null)
+        {
+            var profileMessage = await BuildProfileMessageAsync(telegramUser, callbackQuery.From);
+            var keyboard = CreateProfileKeyboard(telegramUser);
+
+            await _botService.SendMessageAsync(
+                callbackQuery.Message.Chat.Id,
+                profileMessage,
+                keyboard,
+                cancellationToken: cancellationToken);
+        }
     }
 
     private async Task HandleShowStats(CallbackQuery callbackQuery, CancellationToken cancellationToken)
     {
-        await _botService.SendMessageAsync(callbackQuery.Message.Chat.Id, "📊 Загружаем статистику...", cancellationToken: cancellationToken);
+        _logger.LogDebug("User {UserId} requested stats from profile", callbackQuery.From.Id);
 
-        // Имитируем отправку команды stats
+        await _botService.SendMessageAsync(
+            callbackQuery.Message.Chat.Id, 
+            "📊 Загружаем статистику...", 
+            cancellationToken: cancellationToken);
+
         var message = new Message
         {
             From = callbackQuery.From,
@@ -212,9 +418,13 @@ public class ProfileCommandHandler : BaseCommandHandler
 
     private async Task HandleShowUsers(CallbackQuery callbackQuery, CancellationToken cancellationToken)
     {
-        await _botService.SendMessageAsync(callbackQuery.Message.Chat.Id, "👥 Загружаем список пользователей...", cancellationToken: cancellationToken);
+        _logger.LogDebug("User {UserId} requested users list from profile", callbackQuery.From.Id);
 
-        // Имитируем отправку команды users
+        await _botService.SendMessageAsync(
+            callbackQuery.Message.Chat.Id, 
+            "👥 Загружаем список пользователей...", 
+            cancellationToken: cancellationToken);
+
         var message = new Message
         {
             From = callbackQuery.From,
@@ -224,11 +434,4 @@ public class ProfileCommandHandler : BaseCommandHandler
 
         await HandleAsync(message, cancellationToken);
     }
-
-    private static string GetGenderDisplay(Gender gender) => gender switch
-    {
-        Gender.Male => "Мужской",
-        Gender.Female => "Женский",
-        _ => "Не указан"
-    };
 }
