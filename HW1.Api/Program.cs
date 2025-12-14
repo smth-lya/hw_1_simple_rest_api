@@ -4,6 +4,7 @@ using HW1.Api.Application;
 using HW1.Api.Domain.Contracts.Telegram;
 using HW1.Api.Infrastructure;
 using HW1.Api.Infrastructure.Database;
+using HW1.Api.Infrastructure.Grpc;
 using HW1.Api.Infrastructure.Telegram;
 using HW1.Api.WebAPI.Extensions;
 using HW1.Api.WebAPI.TelegramBot.Commands;
@@ -26,32 +27,7 @@ builder.Services
     .AddApplication(builder.Configuration)
     .AddInfrastructure(builder.Configuration);
 
-
-builder.Services.Scan(scan => scan
-    .FromAssemblyOf<ICommandHandler>()
-    .AddClasses(classes => classes
-        .AssignableTo<ICommandHandler>()
-        .Where(type => !type.IsAbstract)
-    )
-    .AsSelfWithInterfaces() 
-    .WithScopedLifetime());
-
-builder.Services.AddTransient<Func<IEnumerable<ICommandHandler>>>(serviceProvider => 
-{
-    return () =>
-    [
-        serviceProvider.GetRequiredService<StartCommandHandler>(),
-        serviceProvider.GetRequiredService<HelpCommandHandler>(),
-        serviceProvider.GetRequiredService<StatsCommandHandler>(),
-        serviceProvider.GetRequiredService<UsersCommandHandler>(),
-        serviceProvider.GetRequiredService<RegisterCommandHandler>(),
-        serviceProvider.GetRequiredService<ProfileCommandHandler>()
-    ];
-});
-
-builder.Services.AddScoped<ITelegramUserService, TelegramUserService>();
-builder.Services.AddScoped<ITelegramBotService, TelegramBotService>();
-builder.Services.AddHostedService<TelegramBotBackgroundService>();
+builder.Services.AddTelegramBotIntegration();
 
 var app = builder.Build();
 
@@ -62,6 +38,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+
+app.MapGrpcService<UserGrpcService>();
+app.MapGrpcService<TelegramGrpcService>();
+
 app.Run();
 
 // Тесты

@@ -6,7 +6,10 @@
     container_name: hw1-api
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_URLS: http://+:80;http://+:5001
+      ASPNETCORE_Kestrel__Endpoints__Http__Url: http://+:80
+      ASPNETCORE_Kestrel__Endpoints__Grpc__Url: http://+:5001
+      ASPNETCORE_Kestrel__Endpoints__Grpc__Protocols: Http2
       DOTNET_RUNNING_IN_CONTAINER: "true"
       ConnectionStrings__PostgresConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};"
       ConnectionStrings__RedisConnection: redis:6379
@@ -20,6 +23,9 @@
         condition: service_healthy
       redis:
         condition: service_healthy
+    ports:
+      - 5000:80
+      - 5001:5001
     volumes:
       - ./logs:/app/Logs
     networks:
