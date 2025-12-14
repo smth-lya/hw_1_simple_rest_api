@@ -1,4 +1,5 @@
 using HW1.Api.Domain.Contracts.Services;
+using HW1.Api.Domain.Contracts.Services.Kafka;
 using HW1.Api.Domain.Contracts.Telegram;
 using Telegram.Bot.Types;
 
@@ -9,17 +10,20 @@ public abstract class BaseCommandHandler : ICommandHandler
     protected readonly ITelegramBotService _botService;
     protected readonly IUserService _userService;
     protected readonly ITelegramUserService _telegramUserService;
+    protected readonly IAnalyticsService _analyticsService;
     protected readonly ILogger _logger;
 
     protected BaseCommandHandler(
         ITelegramBotService botService,
         IUserService userService,
         ITelegramUserService telegramUserService,
+        IAnalyticsService analyticsService,
         ILogger logger)
     {
         _botService = botService;
         _userService = userService;
         _telegramUserService = telegramUserService;
+        _analyticsService = analyticsService;
         _logger = logger;
     }
 
