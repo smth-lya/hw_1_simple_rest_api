@@ -26,9 +26,9 @@
           POSTGRES_PASSWORD=postgres
           REDIS_PASSWORD=redis
           TELEGRAM_BOT_TOKEN={{ lookup('env', 'TELEGRAM_BOT_TOKEN') }}
-      owner: root
-      group: root
-      mode: '0600'
+        owner: root
+        group: root
+        mode: '0600'
         
     - name: Upload docker-compose.yml
       copy:
