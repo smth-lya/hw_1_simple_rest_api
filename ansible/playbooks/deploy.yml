@@ -30,12 +30,12 @@
         group: root
         mode: '0600'
         
-    - name: Upload docker-compose.yml
+    - name: upload docker-compose.yml
       copy:
         src: docker-compose.prod.yml
         dest: "{{ app_dir }}/docker-compose.yml"
             
     - name: start app
-      command: docker-compose up -d --build
+      command: docker compose up -d --build
       args: 
         chdir: "{{ app_dir }}"
