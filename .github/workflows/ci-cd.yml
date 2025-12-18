@@ -55,7 +55,7 @@ jobs:
           
           for host in $(ansible-inventory -i ansible/inventory/prod.ini \
               --list | jq -r '.. | .ansible_host? // empty'); do
-            ssh-keyscan -H "$host" >> ~/.ssh/known_hosts
+            ssh-keyscan -p 22 -t rsa,ecdsa,ed25519 "$host" >> ~/.ssh/known_hosts
           done
           
           chmod 644 ~/.ssh/known_hosts
