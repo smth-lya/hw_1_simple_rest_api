@@ -64,4 +64,4 @@ jobs:
         run: |
           ansible-playbook ansible/playbooks/deploy.yml \
             -i ansible/inventory/prod.ini \
-            --extra-vars "image_tag=${{ needs.build.outputs.image_tag }}"
+            --extra-vars "image_name=${{ secrets.DH_REGISTRY_USER }}/simple-telegram-bot image_tag=${GITHUB_SHA::7} telegram_bot_token=${{ secrets.TELEGRAM_BOT_TOKEN }}"

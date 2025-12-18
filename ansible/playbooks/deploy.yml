@@ -6,7 +6,8 @@
     app_dir: /opt/tg-bot-app
     image_name: "{{ lookup('env', 'IMAGE_NAME') }}"
     image_tag: "{{ image_tag }}"
-    env_file_path: "{{ app_dir }}/.env"  
+    env_file_path: "{{ app_dir }}/.env"
+    telegram_bot_token: "{{ telegram_bot_token }}"
   
   tasks:
     - name: ensure app directory exists
@@ -25,7 +26,7 @@
           POSTGRES_USER=postgres
           POSTGRES_PASSWORD=postgres
           REDIS_PASSWORD=redis
-          TELEGRAM_BOT_TOKEN={{ lookup('env', 'TELEGRAM_BOT_TOKEN') }}
+          TELEGRAM_BOT_TOKEN={{ telegram_bot_token }}
         owner: root
         group: root
         mode: '0600'
