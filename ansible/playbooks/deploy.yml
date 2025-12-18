@@ -1,0 +1,41 @@
+- name: deploy
+  hosts: prod
+  become: true
+  
+  vars:
+    app_dir: /opt/tg-bot-app
+    image_name: "{{ lookup('env', 'IMAGE_NAME') }}"
+    image_tag: "{{ image_tag }}"
+    env_file_path: "{{ app_dir }}/.env"  
+  
+  tasks:
+    - name: ensure app directory exists
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        
+    - name: upload .env file
+      copy:
+        dest: "{{ env_file_path }}"
+        content: |
+          APP_IMAGE={{ image_name }}
+          APP_TAG={{ image_tag }}
+          ASPNETCORE_ENVIRONMENT=Production
+          POSTGRES_DB=hw1_db
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=postgres
+          REDIS_PASSWORD=redis
+          TELEGRAM_BOT_TOKEN={{ lookup('env', 'TELEGRAM_BOT_TOKEN') }}
+      owner: root
+      group: root
+      mode: '0600'
+        
+    - name: Upload docker-compose.yml
+      copy:
+        src: docker-compose.prod.yml
+        dest: "{{ app_dir }}/docker-compose.yml"
+            
+    - name: start app
+      command: docker compose --env-file .env up -d
+      args: 
+        chdir: "{{ app_dir }}"
