@@ -36,6 +36,7 @@
         dest: "{{ app_dir }}/docker-compose.yml"
             
     - name: start app
+      become: true
       command: docker compose up -d --build
       args: 
         chdir: "{{ app_dir }}"
