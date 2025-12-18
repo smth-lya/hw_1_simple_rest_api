@@ -45,8 +45,20 @@ jobs:
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           
-      - name: install Ansible
-        run: sudo apt-get update && sudo apt-get install -y ansible
+      - name: install Ansible & jq
+        run: sudo apt-get update && sudo apt-get install -y ansible jq
+        
+      - name: add SSH host keys
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          
+          for host in $(ansible-inventory -i ansible/inventory/prod.ini \
+              --list | jq -r '.. | .ansible_host? // empty'); do
+            ssh-keyscan -H "$host" >> ~/.ssh/known_hosts
+          done
+          
+          chmod 644 ~/.ssh/known_hosts
         
       - name: deploy with Ansible
         run: |
